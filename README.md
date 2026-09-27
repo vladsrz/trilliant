@@ -16,9 +16,13 @@ Fan-made. Not affiliated with Space Cowboys or Asmodee. No art or text from the 
 
 The host's browser runs the game, so the host keeps that tab open. If it closes, the game pauses; the host reopens it from **Your games** on the start page (same browser) and everyone reconnects. Other players can close the tab and reopen the link any time without losing their seat. **Leave game** in the lobby gives your seat up.
 
-**Turn timer:** the host picks Off, 1, 2 or 3 minutes in the lobby (default 3). The clock shows next to whose turn it is and goes red in the last 30 seconds. At zero that turn is skipped; if the player was mid put-back or choosing a noble, it's finished for them. The clock pauses while the host is away.
+**Game settings** (host, in the lobby): **Points to win** 15 or 30 (a long game), and a **Turn timer** of Off, 1, 2 or 3 minutes (default 3), matching geminist's options.
+
+**Turn timer:** The clock shows next to whose turn it is and goes red in the last 30 seconds. At zero that turn is skipped; if the player was mid put-back or choosing a noble, it's finished for them. The clock pauses while the host is away.
 
 After a game the host can **Play again**; the lobby and results keep a running win count.
+
+**One game at a time:** a browser hosts one game at a time. Creating a new one ends the old one (after asking, if friends were in it). The start page offers to rejoin your hosted game and the last game you joined; older saves are deleted, so nothing piles up. Nothing is stored anywhere else: there's no server, and the relays keep no messages.
 
 ## How it works
 

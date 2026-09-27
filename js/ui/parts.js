@@ -141,7 +141,7 @@ export function SeatCard({ player, view, online, isTurn, flash }) {
       <span class=${cls('dot', online && 'is-on')} title=${online ? 'Online' : 'Offline'}></span>
       <span class="seatcard__name">${player.name}</span>
       ${isTurn ? html`<span class="seatcard__turn">Their turn</span>` : null}
-      <span class="seatcard__score"><b>${pts}</b><span>/ ${WIN_POINTS}</span></span>
+      <span class="seatcard__score"><b>${pts}</b><span>/ ${view.target || WIN_POINTS}</span></span>
     </div>
     <${Holdings} player=${player} />
     <div class="holdings__foot">
@@ -165,7 +165,7 @@ export function describeCard(id) {
   return `a level ${ROMAN[c.level]} ${COLOR_NAMES[c.color]}${c.points ? ` (${plural(c.points, 'point')})` : ''}`;
 }
 
-export function LogItem({ e, players, you, tag = 'li' }) {
+export function LogItem({ e, players, you, target = WIN_POINTS, tag = 'li' }) {
   const who = e.p !== undefined ? (e.p === you ? 'You' : players[e.p]?.name) : '';
   const W = html`<strong>${who}</strong>`;
   const w = html`<strong>${e.p === you ? 'you' : who}</strong>`;
@@ -186,7 +186,7 @@ export function LogItem({ e, players, you, tag = 'li' }) {
     case 'timeout': body = e.gems
       ? html`${W} ran out of time. Put back <${GemList} gems=${e.gems} /> for ${e.p === you ? 'you' : 'them'}.`
       : html`${W} ran out of time. Turn skipped.`; break;
-    case 'final': key = true; body = html`${W} reached ${WIN_POINTS}. Last round.`; break;
+    case 'final': key = true; body = html`${W} reached ${target}. Last round.`; break;
     case 'end': key = true; body = 'Game over.'; break;
     default: return null;
   }

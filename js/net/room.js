@@ -13,7 +13,7 @@
 
 import { Bus } from './bus.js';
 import { fingerprint, pairKey, sealText, openText, randomId } from './crypto.js';
-import { newGame, applyAction, applyTimeout, viewFor, MAX_PLAYERS, MIN_PLAYERS } from '../engine.js';
+import { newGame, applyAction, applyTimeout, viewFor, MAX_PLAYERS, MIN_PLAYERS, TARGET_CHOICES, WIN_POINTS } from '../engine.js';
 import { saveHostRecord } from './identity.js';
 import { every } from './ticker.js';
 
@@ -101,7 +101,7 @@ export class HostRoom extends Emitter {
       game: null,
       chat: [],
       tally: {},
-      settings: { turnSeconds: DEFAULT_TURN_SECONDS },
+      settings: { turnSeconds: DEFAULT_TURN_SECONDS, target: WIN_POINTS },
       rev: 1,
       createdAt: Date.now(),
     };
@@ -150,11 +150,24 @@ export class HostRoom extends Emitter {
       status: r.status,
       max: MAX_PLAYERS,
       turnSeconds: this.turnSeconds,
+      target: this.target,
       seats: r.seats.map((s) => ({ id: s.id, name: s.name, host: s.id === r.hostId, online: this.isOnline(s.id) })),
     };
   }
 
   // ----- turn clock -----
+
+  get target() {
+    const t = this.record.settings?.target;
+    return TARGET_CHOICES.includes(t) ? t : WIN_POINTS;
+  }
+
+  setTarget(points) {
+    const r = this.record;
+    if (r.status === 'playing' || !TARGET_CHOICES.includes(points) || points === this.target) return;
+    r.settings = { ...(r.settings || {}), target: points };
+    this.bump();
+  }
 
   get turnSeconds() {
     const t = this.record.settings?.turnSeconds;
@@ -353,7 +366,7 @@ export class HostRoom extends Emitter {
     const r = this.record;
     if (r.status === 'playing') return { ok: false, error: 'A game is already running.' };
     if (r.seats.length < MIN_PLAYERS) return { ok: false, error: 'Waiting for at least one more player.' };
-    r.game = newGame(r.seats.map((s) => ({ id: s.id, name: s.name })));
+    r.game = newGame(r.seats.map((s) => ({ id: s.id, name: s.name })), { target: this.target });
     r.status = 'playing';
     this.restartClock();
     this.chatSystem(`New game. ${r.game.players[r.game.start].name} goes first.`);

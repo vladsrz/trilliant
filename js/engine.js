@@ -5,6 +5,8 @@
 import { CARDS, NOBLES, COLORS, GOLD, TOKEN_COLORS } from './data.js';
 
 export const WIN_POINTS = 15;
+// Points needed to trigger the last round. Geminist offers 15 (standard) and 30 (long game).
+export const TARGET_CHOICES = [15, 30];
 export const MAX_TOKENS = 10;
 export const MAX_RESERVED = 3;
 export const MIN_PLAYERS = 2;
@@ -123,7 +125,8 @@ export function deckCounts(state) {
 
 // ---------- setup ----------
 
-export function newGame(seats, { rand = secureRandom } = {}) {
+export function newGame(seats, { rand = secureRandom, target = WIN_POINTS } = {}) {
+  if (!TARGET_CHOICES.includes(target)) throw new Error(`Target must be one of ${TARGET_CHOICES.join(', ')}`);
   const n = seats.length;
   if (n < MIN_PLAYERS || n > MAX_PLAYERS) throw new Error(`Needs ${MIN_PLAYERS}-${MAX_PLAYERS} players`);
   const decks = { 1: [], 2: [], 3: [] };
@@ -149,6 +152,7 @@ export function newGame(seats, { rand = secureRandom } = {}) {
     nobles,
     start,
     turn: start,
+    target,
     round: 1,
     phase: 'play', // play | discard | noble | over
     pending: null,
@@ -396,7 +400,7 @@ function endTurn(s) {
   const pi = s.turn;
   s.phase = 'play';
   s.pending = null;
-  if (!s.finalRound && pointsOf(s.players[pi]) >= WIN_POINTS) {
+  if (!s.finalRound && pointsOf(s.players[pi]) >= (s.target || WIN_POINTS)) {
     s.finalRound = true;
     s.log.push({ t: 'final', p: pi });
   }
@@ -454,6 +458,7 @@ export function viewFor(s, viewerId) {
     phase: s.phase,
     turn: s.turn,
     start: s.start,
+    target: s.target || WIN_POINTS,
     round: s.round,
     finalRound: s.finalRound,
     pending: s.pending && (s.turn === you ? s.pending : { type: s.pending.type }),

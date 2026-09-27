@@ -6,6 +6,7 @@ import {
 } from '../engine.js';
 import { Gem, Card, Deck, Noble, Well, Holdings, Reserved, SeatCard, LogItem, cls, ROMAN, describeCard } from './parts.js';
 import { NAME_MAX, CHAT_MAX, TIMER_CHOICES } from '../net/room.js';
+import { TARGET_CHOICES } from '../engine.js';
 import { every } from '../net/ticker.js';
 
 const TIMER_LABELS = { 0: 'Off', 60: '1 min', 120: '2 min', 180: '3 min' };
@@ -40,14 +41,21 @@ function ago(ts) {
 // ======================================================================
 
 export function Home({ name, onName, onCreate, tables, onResume, onForget, busy }) {
-  const submit = (e) => { e.preventDefault(); onCreate(); };
+  const [confirm, setConfirm] = useState(false);
+  const hosted = tables.find((t) => t.role === 'host');
+  // One hosted game per browser: a new one ends the old, so ask first if friends were in it.
+  const submit = (e) => {
+    e.preventDefault();
+    if (hosted && hosted.players > 0) setConfirm(true);
+    else onCreate(hosted);
+  };
   return html`<main class="home">
     <div class="home__inner">
       <div class="home__gems" aria-hidden="true">
         ${['white', 'blue', 'green', 'red', 'black', 'gold'].map((c) => html`<${Gem} color=${c} />`)}
       </div>
       <h1 class="home__mark">Trilliant</h1>
-      <p class="home__lede">Trade gems, buy cards, win nobles. First to ${WIN_POINTS} points wins. Create a game and send the link to a friend.</p>
+      <p class="home__lede">Trade gems, buy cards, win nobles. Create a game and send the link to a friend.</p>
       <form class="panel home__form" onSubmit=${submit}>
         <div>
           <label class="label" for="name">Your name</label>
@@ -58,19 +66,29 @@ export function Home({ name, onName, onCreate, tables, onResume, onForget, busy 
           </div>
         </div>
         ${tables.length ? html`<div class="tables">
-          <h2 class="tables__title">Your games</h2>
-          ${tables.map((t) => html`<div class="tables__row">
+          <h2 class="tables__title">Pick up where you left off</h2>
+          ${[...tables].sort((a, b) => (a.role === b.role ? 0 : a.role === 'host' ? -1 : 1)).map((t) => html`<div class="tables__row">
             <div class="tables__what">
               <strong>${t.title || (t.role === 'host' ? 'Your game' : 'A friend’s game')}</strong>
               <span>${t.role === 'host' ? 'You’re the host' : 'You joined'} · ${ago(t.at)}</span>
             </div>
             <button type="button" class="btn btn--small" onClick=${() => onResume(t)}>Rejoin</button>
-            <button type="button" class="btn btn--small btn--ghost" aria-label="Remove from list" onClick=${() => onForget(t)}>✕</button>
+            <button type="button" class="btn btn--small btn--ghost" onClick=${() => onForget(t)}>${t.role === 'host' ? 'End' : 'Remove'}</button>
           </div>`)}
         </div>` : null}
       </form>
       <p class="home__small">Free, no sign-up. Plays by the rules of Splendor; fan-made, not affiliated with Space Cowboys or Asmodee.</p>
     </div>
+    ${confirm ? html`<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="replace-title">
+      <section class="panel sheet notice">
+        <h2 class="sheet__title" id="replace-title">You already have a game going</h2>
+        <p class="sheet__sub">You can host one game at a time. Starting a new one ends ${hosted.title ? hosted.title.replace(/^Your game/, 'your game') : 'your current game'}, and nobody can continue it.</p>
+        <div class="sheet__actions">
+          <button type="button" class="btn" onClick=${() => setConfirm(false)}>Keep it</button>
+          <button type="button" class="btn btn--danger-solid" onClick=${() => { setConfirm(false); onCreate(hosted); }}>End it and start new</button>
+        </div>
+      </section>
+    </div>` : null}
   </main>`;
 }
 
@@ -160,6 +178,15 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
       </ul>
 
       <div class="setting">
+        <span class="setting__label">Points to win</span>
+        ${isHost
+          ? html`<div class="segmented" role="radiogroup" aria-label="Points to win">
+              ${TARGET_CHOICES.map((pts) => html`<button type="button" role="radio" aria-checked=${String(lobby.target === pts)}
+                class=${cls(lobby.target === pts && 'is-on')} onClick=${() => room.setTarget(pts)}>${pts}</button>`)}
+            </div>`
+          : html`<span class="setting__value">${lobby.target ?? 15}</span>`}
+      </div>
+      <div class="setting setting--tight">
         <span class="setting__label">Turn timer</span>
         ${isHost
           ? html`<div class="segmented" role="radiogroup" aria-label="Turn timer">
@@ -360,7 +387,7 @@ export function Game({ snap, room, onLeave, notify }) {
           <div class="seatcard__head">
             <span class="dot is-on"></span>
             <span class="seatcard__name">${me.name} <span class="seat__you">(you)</span></span>
-            <span class="seatcard__score"><b>${pointsOf(me)}</b><span>/ ${WIN_POINTS}</span></span>
+            <span class="seatcard__score"><b>${pointsOf(me)}</b><span>/ ${g.target || WIN_POINTS}</span></span>
           </div>
           <${Holdings} player=${me} onGem=${mustReturn ? clickOwnGem : undefined} marked=${mustReturn ? marked : undefined} />
           <div class="holdings__foot">
@@ -444,7 +471,7 @@ function Tray(p) {
   } else if (!myTurn) {
     title = g.phase === 'discard' ? `${current.name} is returning gems` : g.phase === 'noble' ? `${current.name} is choosing a noble` : `${current.name}’s turn`;
     const last = [...g.log].reverse().find((e) => ['take', 'reserve', 'buy', 'pass', 'timeout'].includes(e.t));
-    hint = last ? html`<${LogItem} e=${last} players=${g.players} you=${you} tag="span" />` : 'Waiting for their move.';
+    hint = last ? html`<${LogItem} e=${last} players=${g.players} you=${you} target=${g.target} tag="span" />` : 'Waiting for their move.';
   } else if (g.phase === 'discard') {
     title = 'Too many gems';
     hint = `You can hold ${MAX_TOKENS}. Tap ${mustReturn} of your gems below to put back.`;
@@ -537,7 +564,7 @@ function Feed({ g, chat, you, selfId, onSend }) {
     </div>
     <div class="feed__body" ref=${body}>
       ${tab === 'log'
-        ? html`<ul class="log">${g.log.map((e) => html`<${LogItem} e=${e} players=${g.players} you=${you} />`)}</ul>`
+        ? html`<ul class="log">${g.log.map((e) => html`<${LogItem} e=${e} players=${g.players} you=${you} target=${g.target} />`)}</ul>`
         : chat.length
           ? html`<ul class="chat">${chat.map((m) => (m.from
             ? html`<li class="chat__msg"><strong>${m.from === selfId ? 'You' : m.name}</strong><span>${m.text}</span></li>`

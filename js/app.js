@@ -4,7 +4,7 @@ import { Home, Lobby, Game, Notice, Connecting } from './ui/screens.js';
 import { roomFromSecret, newRoomSecret } from './net/crypto.js';
 import { HostRoom, GuestRoom, cleanName } from './net/room.js';
 import {
-  browserStorage, resolveIdentity, holdIdentity, loadHostRecord, listTables, rememberTable, forgetTable, loadName, saveName,
+  browserStorage, resolveIdentity, holdIdentity, loadHostRecord, listTables, rememberTable, forgetTable, sweepStorage, loadName, saveName,
 } from './net/identity.js';
 
 const storage = browserStorage();
@@ -82,13 +82,15 @@ function App() {
 
 function HomeScreen({ notify }) {
   const [name, setName] = useState(defaultName);
-  const [tables, setTables] = useState(() => listTables(storage));
+  const [tables, setTables] = useState(() => { sweepStorage(storage); return listTables(storage); });
   const [busy, setBusy] = useState(false);
 
   const onName = (v) => { setName(v); if (v.trim()) saveName(storage, cleanName(v)); };
-  const onCreate = async () => {
+  // `replacing` is the game this browser already hosts: creating a new one ends it.
+  const onCreate = async (replacing) => {
     setBusy(true);
     try {
+      if (replacing) forgetTable(storage, replacing.roomId);
       saveName(storage, cleanName(name));
       const secret = newRoomSecret();
       const room = await roomFromSecret(secret);
@@ -141,11 +143,15 @@ function RoomScreen({ secret, hostId, notify }) {
         const s = room.snapshot();
         setSnap(s);
         // Keep "Your games" on the start page labelled with who is playing.
-        const others = (s.lobby?.seats || []).filter((x) => x.id !== s.selfId).map((x) => x.name);
-        const title = others.length ? `Game with ${others.join(', ')}` : s.role === 'host' ? 'Your game' : '';
+        const seats = s.lobby?.seats || [];
+        const others = seats.filter((x) => x.id !== s.selfId).map((x) => x.name);
+        const hostName = seats.find((x) => x.host)?.name;
+        const title = s.role === 'host'
+          ? (others.length ? `Your game with ${others.join(', ')}` : 'Your game')
+          : (hostName ? `${hostName}’s game` : '');
         if (title !== titleKey) {
           titleKey = title;
-          rememberTable(storage, { roomId: r.id, secret, hostId, role: room.role, title });
+          rememberTable(storage, { roomId: r.id, secret, hostId, role: room.role, title, players: others.length });
         }
       };
       unsub = room.subscribe(refresh);

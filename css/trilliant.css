@@ -142,6 +142,7 @@ button { cursor: pointer; }
 
 .invite { display: flex; gap: 8px; align-items: stretch; margin: 0 0 22px; }
 .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+.setting--tight { margin-top: 10px; }
 .setting__label { font-size: 14px; color: var(--text-mute); }
 .setting__value { font-weight: 600; }
 .segmented { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; border: 1px solid var(--line-brass); }

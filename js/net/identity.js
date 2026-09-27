@@ -13,6 +13,8 @@ function memoryStore() {
     getItem: (k) => (m.has(k) ? m.get(k) : null),
     setItem: (k, v) => m.set(k, String(v)),
     removeItem: (k) => m.delete(k),
+    key: (i) => [...m.keys()][i] ?? null,
+    get length() { return m.size; },
   };
 }
 
@@ -65,8 +67,9 @@ export async function resolveIdentity(storage, roomId, { forceNew = false } = {}
     return { identity };
   }
   const identity = await createIdentity();
-  writeJSON(storage.session, tabKey, identity.stored);
-  if (!shared) writeJSON(storage.local, localKey, identity.stored);
+  const stored = { ...identity.stored, at: Date.now() };
+  writeJSON(storage.session, tabKey, stored);
+  if (!shared) writeJSON(storage.local, localKey, stored);
   return { identity };
 }
 
@@ -92,15 +95,50 @@ export function listTables(storage) {
   return Array.isArray(list) ? list : [];
 }
 
+function dropGame(storage, roomId) {
+  for (const k of [`trilliant:room:${roomId}`, `trilliant:id:${roomId}`, `trilliant:live:${roomId}`]) storage.local.removeItem(k);
+}
+
+// One game you host and one game you joined, at most. Anything pushed out is
+// deleted along with its saved state, so nothing piles up in the browser.
 export function rememberTable(storage, entry) {
-  const list = listTables(storage).filter((t) => t.roomId !== entry.roomId);
-  list.unshift({ ...entry, at: Date.now() });
-  writeJSON(storage.local, 'trilliant:tables', list.slice(0, 8));
+  const list = [{ ...entry, at: Date.now() }, ...listTables(storage).filter((t) => t.roomId !== entry.roomId)];
+  const keep = [];
+  const roles = new Set();
+  for (const t of list) {
+    if (roles.has(t.role)) dropGame(storage, t.roomId);
+    else { roles.add(t.role); keep.push(t); }
+  }
+  writeJSON(storage.local, 'trilliant:tables', keep);
+}
+
+export function hostedTable(storage) {
+  return listTables(storage).find((t) => t.role === 'host') || null;
 }
 
 export function forgetTable(storage, roomId) {
   writeJSON(storage.local, 'trilliant:tables', listTables(storage).filter((t) => t.roomId !== roomId));
-  for (const k of [`trilliant:room:${roomId}`, `trilliant:id:${roomId}`]) storage.local.removeItem(k);
+  dropGame(storage, roomId);
+}
+
+// Saved games that aren't on the list any more (older versions kept up to
+// eight). Only runs from the start page, and skips anything touched in the
+// last hour so a game being opened in another tab is never caught.
+export function sweepStorage(storage, now = Date.now()) {
+  const store = storage.local;
+  if (typeof store.length !== 'number' || typeof store.key !== 'function') return 0;
+  const listed = new Set(listTables(storage).map((t) => t.roomId));
+  const doomed = [];
+  for (let i = 0; i < store.length; i++) {
+    const key = store.key(i);
+    const m = /^trilliant:(room|id|live):(.+)$/.exec(key || '');
+    if (!m || listed.has(m[2])) continue;
+    const rec = readJSON(store, key);
+    const at = rec?.createdAt || rec?.at || 0;
+    if (now - at > 3600 * 1000) doomed.push(key);
+  }
+  for (const key of doomed) store.removeItem(key);
+  return doomed.length;
 }
 
 export const loadName = (storage) => {

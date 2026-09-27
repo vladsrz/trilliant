@@ -312,6 +312,22 @@ test('a timeout by the last seat in the final round ends the game', () => {
   assert.equal(applyTimeout(t).ok, false);
 });
 
+test('a 30-point game only ends its last round at 30', () => {
+  let s = newGame(seats(2), { rand: seededRandom(3), target: 30 });
+  assert.equal(s.target, 30);
+  assert.equal(viewFor(s, 'p0').target, 30);
+  const first = s.start;
+  const fives = CARDS.filter((c) => c.points === 5).map((c) => c.id);
+  s = withPlayer(s, first, { cards: fives.slice(0, 3) }); // 15 points: not enough
+  s = act(s, { type: 'take', gems: ['white', 'blue', 'green'] });
+  assert.equal(s.finalRound, false);
+  s = act(s, { type: 'take', gems: ['white', 'blue', 'green'] });
+  s = withPlayer(s, first, { cards: [...fives, ...CARDS.filter((c) => c.points === 4).slice(0, 2).map((c) => c.id)] }); // 25 + 8 = 33
+  s = act(s, { type: 'take', gems: ['red', 'black', 'white'] });
+  assert.equal(s.finalRound, true);
+  assert.throws(() => newGame(seats(2), { target: 20 }));
+});
+
 // ---------- whole-game simulation ----------
 
 function checkInvariants(s, n) {
@@ -362,7 +378,7 @@ test('thousands of random games keep every invariant', () => {
   for (let seed = 1; seed <= 1500; seed++) {
     const n = 2 + (seed % 3);
     const rand = seededRandom(seed * 7919);
-    let s = newGame(seats(n), { rand });
+    let s = newGame(seats(n), { rand, target: seed % 5 === 0 ? 30 : 15 });
     let steps = 0;
     const policy = seed % 2 ? greedyAction : randomAction;
     while (s.phase !== 'over' && steps < 3000) {
