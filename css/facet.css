@@ -36,7 +36,6 @@
 
   --radius: 14px;
   --cw: clamp(72px, min((100vw - 480px) / 6.9, (100vh - 370px) / 4.3), 128px);
-  --ch: calc(var(--cw) * 1.36);
   --nw: calc(var(--cw) * 0.84);
   --tw: calc(var(--cw) * 0.56);
 }
@@ -204,7 +203,7 @@ button { cursor: pointer; }
 .card {
   --band: var(--band-white); --band-ink: var(--ink-white);
   position: relative; flex: none;
-  width: var(--cw); height: var(--ch); padding: 0;
+  width: var(--cw); height: calc(var(--cw) * 1.36); padding: 0;
   border: 0; border-radius: calc(var(--cw) * 0.075);
   background: #f4eee3;
   color: var(--ink); text-align: left;
@@ -244,7 +243,7 @@ button { cursor: pointer; }
 }
 @keyframes flash { 0%, 55% { opacity: 1; } 100% { opacity: 0; } }
 
-.slot { width: var(--cw); height: var(--ch); border-radius: calc(var(--cw) * 0.075); border: 1px dashed rgba(240, 231, 215, 0.12); flex: none; }
+.slot { width: var(--cw); height: calc(var(--cw) * 1.36); border-radius: calc(var(--cw) * 0.075); border: 1px dashed rgba(240, 231, 215, 0.12); flex: none; }
 
 /* card sizes */
 .card--mini { --cw: calc(var(--cw-base, 100px) * 0.62); }
@@ -254,7 +253,7 @@ button { cursor: pointer; }
 
 .deck {
   position: relative; flex: none;
-  width: var(--cw); height: var(--ch); padding: 0;
+  width: var(--cw); height: calc(var(--cw) * 1.36); padding: 0;
   border-radius: calc(var(--cw) * 0.075);
   border: 1px solid rgba(201, 163, 90, 0.45);
   background: #33271f;
@@ -395,7 +394,7 @@ button { cursor: pointer; }
 
 /* ---------- side column ---------- */
 
-.opps { display: flex; flex-direction: column; gap: 10px; }
+.opps { display: flex; flex-direction: column; gap: 10px; flex: none; max-height: 72%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--velvet-500) transparent; }
 .opp .reserved { margin-top: 10px; }
 .opp .reserved .card, .opp .reserved .deck, .opp .reserved .slot { --cw: 46px; }
 
