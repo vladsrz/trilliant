@@ -157,7 +157,7 @@ const DEFS = `<defs>
   </radialGradient>
 </defs>`;
 
-export const GEM_SPRITE = `<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+export const GEM_SPRITE = `<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="0" height="0">
   ${DEFS}
   ${Object.keys(CUTS).map((c) => gemSymbol(c)).join('')}
   ${COIN}

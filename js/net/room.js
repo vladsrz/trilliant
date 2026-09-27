@@ -22,6 +22,7 @@ const ONLINE_MS = 10000;
 const ACT_RETRY_MS = 2500;
 const ACT_TRIES = 8;
 const CHAT_KEEP = 120;
+const CLIENTS_MAX = 24;
 const CHAT_SEND = 60;
 export const NAME_MAX = 20;
 export const CHAT_MAX = 240;
@@ -34,6 +35,18 @@ export function cleanName(name) {
 function cleanChat(text) {
   if (typeof text !== 'string') return '';
   return text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, '').trim().slice(0, CHAT_MAX);
+}
+
+// The host is trusted with the rules, but a view that isn't even shaped like a
+// view gets dropped rather than handed to the renderer.
+function plausibleSync(m) {
+  const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
+  if (!isObj(m) || !Number.isInteger(m.rev) || !isObj(m.lobby) || !Array.isArray(m.lobby.seats)) return false;
+  if (m.game === null) return true;
+  const g = m.game;
+  return isObj(g) && Array.isArray(g.players) && g.players.length >= 2 && g.players.length <= MAX_PLAYERS
+    && isObj(g.board) && isObj(g.bank) && isObj(g.deckCounts) && Array.isArray(g.log) && Array.isArray(g.nobles)
+    && Number.isInteger(g.version) && Number.isInteger(g.turn) && Number.isInteger(g.you);
 }
 
 class Emitter {
@@ -154,6 +167,14 @@ export class HostRoom extends Emitter {
     let c = this.clients.get(id);
     if (c) return c;
     if (typeof pub !== 'string' || pub.length > 120 || (await fingerprint(pub)) !== id) return null;
+    // Anyone holding the link can mint identities; keep the list bounded and
+    // drop the longest-silent unseated one first.
+    if (this.clients.size >= CLIENTS_MAX) {
+      const seated = new Set(this.record.seats.map((x) => x.id));
+      const stale = [...this.clients].filter(([k]) => !seated.has(k)).sort((a, b) => a[1].lastSeen - b[1].lastSeen)[0];
+      if (!stale) return null;
+      this.clients.delete(stale[0]);
+    }
     c = {
       pub,
       key: pairKey(this.identity, pub, this.room.secretBytes),
@@ -459,7 +480,7 @@ export class GuestRoom extends Emitter {
     const msg = await openText(key, d.box);
     if (msg) this.lastHost = Date.now();
     if (!msg) return;
-    if (env.t === 'sync' && Number.isInteger(msg.rev) && msg.rev > this.rev) {
+    if (env.t === 'sync' && plausibleSync(msg) && msg.rev > this.rev) {
       this.rev = msg.rev;
       this.lobby = msg.lobby;
       this.game = msg.game;

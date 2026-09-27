@@ -169,25 +169,30 @@ export function describeCard(id) {
   return `a level ${ROMAN[c.level]} ${COLOR_NAMES[c.color]}${c.points ? ` (${plural(c.points, 'point')})` : ''}`;
 }
 
-export function LogItem({ e, players, you }) {
+export function LogItem({ e, players, you, tag = 'li' }) {
   const who = e.p !== undefined ? (e.p === you ? 'You' : players[e.p]?.name) : '';
   const W = html`<strong>${who}</strong>`;
   const w = html`<strong>${e.p === you ? 'you' : who}</strong>`;
+  let body = null;
+  let key = false;
   switch (e.t) {
-    case 'start': return html`<li class="log__item is-key">${W} ${e.p === you ? 'go' : 'goes'} first.</li>`;
-    case 'take': return html`<li class="log__item">${W} took <${GemList} gems=${e.gems} /></li>`;
+    case 'start': key = true; body = html`${W} ${e.p === you ? 'go' : 'goes'} first.`; break;
+    case 'take': body = html`${W} took <${GemList} gems=${e.gems} />`; break;
     case 'reserve': {
       const what = e.card === null || e.card === undefined ? `a face-down level ${ROMAN[e.level]} card` : describeCard(e.card);
-      return html`<li class="log__item">${W} reserved ${what}${e.blind && e.card != null ? ' from the deck' : ''}${e.gold ? html`, +<${Gem} color="gold" title="gold" />` : ''}</li>`;
+      body = html`${W} reserved ${what}${e.blind && e.card != null ? ' from the deck' : ''}${e.gold ? html` and took <${Gem} color="gold" title="gold" />` : ''}`;
+      break;
     }
-    case 'buy': return html`<li class="log__item">${W} bought <${Gem} color=${CARDS[e.card].color} /> ${describeCard(e.card)}${e.fromReserve ? ' from reserve' : ''}</li>`;
-    case 'discard': return html`<li class="log__item">${W} returned <${GemList} gems=${e.gems} /></li>`;
-    case 'noble': return html`<li class="log__item is-key">A noble visited ${w}. +3</li>`;
-    case 'pass': return html`<li class="log__item">${W} had no move and passed.</li>`;
-    case 'final': return html`<li class="log__item is-key">${W} reached ${WIN_POINTS}. Last round.</li>`;
-    case 'end': return html`<li class="log__item is-key">Game over.</li>`;
+    case 'buy': body = html`${W} bought <${Gem} color=${CARDS[e.card].color} /> ${describeCard(e.card)}${e.fromReserve ? ' from reserve' : ''}`; break;
+    case 'discard': body = html`${W} put back <${GemList} gems=${e.gems} />`; break;
+    case 'noble': key = true; body = html`A noble visited ${w}. +3`; break;
+    case 'pass': body = html`${W} had no move and passed.`; break;
+    case 'final': key = true; body = html`${W} reached ${WIN_POINTS}. Last round.`; break;
+    case 'end': key = true; body = 'Game over.'; break;
     default: return null;
   }
+  const Tag = tag;
+  return html`<${Tag} class=${cls('log__item', key && 'is-key')}>${body}<//>`;
 }
 
 // One-line summary of a player's latest move, for the tray while you wait.

@@ -1,4 +1,4 @@
-import { html, render, useState, useEffect, useRef, useCallback } from '../vendor/preact-htm.js';
+import { html, render, useState, useEffect, useRef, useCallback, useErrorBoundary } from '../vendor/preact-htm.js';
 import { injectSprite } from './ui/gems.js';
 import { Home, Lobby, Game, Notice, Connecting } from './ui/screens.js';
 import { roomFromSecret, newRoomSecret } from './net/crypto.js';
@@ -38,6 +38,17 @@ function useToast() {
   return [toast, notify];
 }
 
+// If a bad message ever breaks rendering, say so instead of going blank.
+function Fence({ children }) {
+  const [error] = useErrorBoundary();
+  if (error) {
+    return html`<${Notice} title="Something broke on this page"
+      actions=${html`<button class="btn btn--primary" onClick=${() => location.reload()}>Reload</button>`}>
+      Reloading picks the table back up where it was.</${Notice}>`;
+  }
+  return children;
+}
+
 // ======================================================================
 
 function App() {
@@ -64,7 +75,7 @@ function App() {
   } else {
     screen = html`<${HomeScreen} notify=${notify} />`;
   }
-  return html`${screen}${toast ? html`<div class="toast" role="status">${toast}</div>` : null}`;
+  return html`<${Fence}>${screen}</${Fence}>${toast ? html`<div class="toast" role="status">${toast}</div>` : null}`;
 }
 
 // ======================================================================

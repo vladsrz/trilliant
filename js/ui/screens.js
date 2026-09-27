@@ -401,7 +401,7 @@ function ShortLine({ me, card }) {
 
 function Tray(p) {
   const { g, me, you, myTurn, over, current, picks, isPair, takeReady, rules, sel, busy, err, fresh, mustReturn, marked, markedTotal } = p;
-  let title, hint, body = null, buttons = null;
+  let title, hint, extra = null, buttons = null;
 
   if (over) {
     const names = g.result.winners.map((w) => (w === you ? 'You' : g.players[w].name));
@@ -411,14 +411,13 @@ function Tray(p) {
   } else if (!myTurn) {
     title = g.phase === 'discard' ? `${current.name} is returning gems` : g.phase === 'noble' ? `${current.name} is choosing a noble` : `${current.name}’s turn`;
     const last = [...g.log].reverse().find((e) => ['take', 'reserve', 'buy', 'pass'].includes(e.t));
-    body = last ? html`<ul class="log">${html`<${LogItem} e=${last} players=${g.players} you=${you} />`}</ul>` : null;
-    hint = last ? null : 'Waiting for their move.';
+    hint = last ? html`<${LogItem} e=${last} players=${g.players} you=${you} tag="span" />` : 'Waiting for their move.';
   } else if (g.phase === 'discard') {
     title = `Put back ${mustReturn} gem${mustReturn === 1 ? '' : 's'}`;
     hint = `You can hold ${MAX_TOKENS}. Tap your gems below to choose which go back.`;
     const picked = [];
     for (const c of TOKEN_COLORS) for (let i = 0; i < (marked[c] || 0); i++) picked.push(c);
-    body = picked.length ? html`<div class="tray__picks">${picked.map((c) => html`<${Gem} color=${c} title=${COLOR_NAMES[c]} />`)}</div>` : null;
+    extra = picked.length ? html`<div class="tray__picks">${picked.map((c) => html`<${Gem} color=${c} title=${COLOR_NAMES[c]} />`)}</div>` : null;
     buttons = html`
       <button type="button" class="btn btn--primary" disabled=${busy || markedTotal !== mustReturn} onClick=${p.onReturn}>Put back ${markedTotal}/${mustReturn}</button>
       ${markedTotal ? html`<button type="button" class="btn" onClick=${p.onClear}>Clear</button>` : null}`;
@@ -430,7 +429,7 @@ function Tray(p) {
     const pay = autoPayment(me, card);
     const canReserve = sel.from === 'board' && me.reserved.length < MAX_RESERVED;
     title = `Level ${ROMAN[card.level]} ${COLOR_NAMES[card.color]}${card.points ? ` · ${card.points} point${card.points > 1 ? 's' : ''}` : ''}`;
-    body = html`<div class="tray__hint">${pay ? html`<${PayLine} pay=${pay} />` : html`<${ShortLine} me=${me} card=${card} />`}</div>`;
+    hint = pay ? html`<${PayLine} pay=${pay} />` : html`<${ShortLine} me=${me} card=${card} />`;
     buttons = html`
       <button type="button" class=${cls('btn', pay && 'btn--primary')} disabled=${busy || !pay} onClick=${() => p.onBuy(sel.id)}>Buy</button>
       ${sel.from === 'board' ? html`<button type="button" class=${cls('btn', !pay && 'btn--primary')} disabled=${busy || !canReserve} onClick=${() => p.onReserveCard(sel.id)}
@@ -445,7 +444,7 @@ function Tray(p) {
       <button type="button" class="btn btn--ghost" onClick=${p.onClear}>Cancel</button>`;
   } else if (picks.length) {
     title = 'Take gems';
-    body = html`<div class="tray__picks">${picks.map((c) => html`<${Gem} color=${c} title=${COLOR_NAMES[c]} />`)}</div>`;
+    extra = html`<div class="tray__picks">${picks.map((c) => html`<${Gem} color=${c} title=${COLOR_NAMES[c]} />`)}</div>`;
     if (isPair) hint = `Two ${COLOR_NAMES[picks[0]]}s.`;
     else if (takeReady) hint = picks.length === 1 && rules.pairable.includes(picks[0]) ? `Or tap it again to take two.` : 'Ready.';
     else {
@@ -468,8 +467,8 @@ function Tray(p) {
     <div class="tray__text">
       <div class="tray__title">${title}</div>
       ${err ? html`<div class="tray__hint is-error">${err}</div>` : hint ? html`<div class="tray__hint">${hint}</div>` : null}
-      ${body}
     </div>
+    ${extra}
     ${busy && myTurn ? html`<span class="tray__hint">Sending…</span>` : null}
     ${buttons ? html`<div class="tray__buttons">${buttons}</div>` : null}
   </section>`;
