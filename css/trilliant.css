@@ -141,6 +141,13 @@ button { cursor: pointer; }
 .notice .sheet__actions { justify-content: center; }
 
 .invite { display: flex; gap: 8px; align-items: stretch; margin: 0 0 22px; }
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+.setting__label { font-size: 14px; color: var(--text-mute); }
+.setting__value { font-weight: 600; }
+.segmented { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; border: 1px solid var(--line-brass); }
+.segmented button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--text-mute); font-weight: 600; font-size: 13px; }
+.segmented button:hover { color: var(--text); }
+.segmented button.is-on { background: #d4b06a; color: #241809; }
 .invite__link {
   flex: 1; min-width: 0; display: flex; align-items: center; padding: 0 12px;
   border-radius: 10px; border: 1px dashed var(--line-brass); background: rgba(0, 0, 0, 0.22);
@@ -182,6 +189,11 @@ button { cursor: pointer; }
 }
 .turnpill.is-mine { color: #241809; border-color: transparent; background: #d4b06a; }
 .turnpill__final { color: var(--warn); }
+.turnpill__clock { font-variant-numeric: tabular-nums; font-weight: 700; opacity: 0.85; min-width: 2.6em; text-align: right; }
+.turnpill.is-warn { border-color: rgba(233, 115, 99, 0.7); }
+.turnpill.is-warn .turnpill__clock { color: #ff9d8f; opacity: 1; }
+.turnpill.is-mine.is-warn { background: #e6a07a; }
+.turnpill.is-mine.is-warn .turnpill__clock { color: #6b1308; }
 .turnpill.is-mine .turnpill__final { color: #7a2a12; }
 
 .main { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }

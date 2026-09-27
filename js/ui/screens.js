@@ -5,7 +5,23 @@ import {
   MAX_TOKENS, MAX_RESERVED, WIN_POINTS,
 } from '../engine.js';
 import { Gem, Card, Deck, Noble, Well, Holdings, Reserved, SeatCard, LogItem, cls, ROMAN, describeCard } from './parts.js';
-import { NAME_MAX, CHAT_MAX } from '../net/room.js';
+import { NAME_MAX, CHAT_MAX, TIMER_CHOICES } from '../net/room.js';
+import { every } from '../net/ticker.js';
+
+const TIMER_LABELS = { 0: 'Off', 60: '1 min', 120: '2 min', 180: '3 min' };
+const clock = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+
+// Seconds left until `deadline`, ticking once a second. Runs on the worker
+// ticker so the countdown in a background tab's title keeps moving.
+function useSecondsLeft(deadline) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!deadline) return undefined;
+    setNow(Date.now());
+    return every(1000, () => setNow(Date.now()));
+  }, [deadline]);
+  return deadline ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null;
+}
 
 const sum = (obj) => Object.values(obj).reduce((a, b) => a + b, 0);
 const nameList = (names) => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`);
@@ -143,6 +159,16 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
           <span class="seat__name">${canStart ? `Room for ${open} more` : 'Waiting for someone to join…'}</span></li>` : null}
       </ul>
 
+      <div class="setting">
+        <span class="setting__label">Turn timer</span>
+        ${isHost
+          ? html`<div class="segmented" role="radiogroup" aria-label="Turn timer">
+              ${TIMER_CHOICES.map((sec) => html`<button type="button" role="radio" aria-checked=${String(lobby.turnSeconds === sec)}
+                class=${cls(lobby.turnSeconds === sec && 'is-on')} onClick=${() => room.setTimer(sec)}>${TIMER_LABELS[sec]}</button>`)}
+            </div>`
+          : html`<span class="setting__value">${TIMER_LABELS[lobby.turnSeconds] ?? 'Off'}</span>`}
+      </div>
+
       <div class="sheet__actions">
         <button type="button" class="btn btn--danger" onClick=${onLeave}>Leave game</button>
         ${isHost
@@ -166,7 +192,7 @@ function useChanges(g, you) {
     const p = prev.current;
     prev.current = g;
     if (!p || g.version <= p.version || g.players.length !== p.players.length) return undefined;
-    const lastMove = [...g.log].reverse().find((e) => ['take', 'reserve', 'buy', 'discard', 'noble', 'pass'].includes(e.t));
+    const lastMove = [...g.log].reverse().find((e) => ['take', 'reserve', 'buy', 'discard', 'noble', 'pass', 'timeout'].includes(e.t));
     const theirs = lastMove && lastMove.p !== you;
     const slots = new Set(), dealt = new Set(), bank = new Set(), seats = new Set();
     for (const l of [1, 2, 3]) g.board[l].forEach((id, i) => { if (p.board[l][i] !== id) { dealt.add(`${l}-${i}`); if (theirs) slots.add(`${l}-${i}`); } });
@@ -205,20 +231,13 @@ export function Game({ snap, room, onLeave, notify }) {
   useEffect(() => { setPicks([]); setSel(null); setMarked({}); setErr(null); }, [g.version]);
   useEffect(() => { if (over) setShowResult(true); }, [over]);
 
-  // Your-turn cue: pulse the tray, and flag the tab title when you're elsewhere.
+  // Your-turn cue: pulse the tray. (The tab title lives in TurnPill.)
   useEffect(() => {
     if (!myTurn) { setFresh(false); return undefined; }
     setFresh(true);
     const t = setTimeout(() => setFresh(false), 1500);
     return () => clearTimeout(t);
   }, [myTurn, g.turn, g.round]);
-  useEffect(() => {
-    const base = 'Trilliant';
-    const update = () => { document.title = myTurn && document.hidden ? '● Your turn · Trilliant' : base; };
-    update();
-    document.addEventListener('visibilitychange', update);
-    return () => { document.removeEventListener('visibilitychange', update); document.title = base; };
-  }, [myTurn]);
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') { setPicks([]); setSel(null); setMarked({}); setErr(null); } };
     addEventListener('keydown', onKey);
@@ -290,10 +309,7 @@ export function Game({ snap, room, onLeave, notify }) {
     <header class="topbar">
       <p class="topbar__mark">Trilliant</p>
       <div class="topbar__status" aria-live="polite">
-        <span class=${cls('turnpill', myTurn && 'is-mine')}>
-          ${over ? 'Game over' : myTurn ? 'Your turn' : `${current.name}’s turn`}
-          ${g.finalRound && !over ? html`<span class="turnpill__final">Last round</span>` : null}
-        </span>
+        <${TurnPill} g=${g} myTurn=${myTurn} over=${over} current=${current} timer=${snap.timer} />
       </div>
       <div class="topbar__tools">
         <button type="button" class="btn btn--small btn--danger" onClick=${onLeave}>Leave game</button>
@@ -383,6 +399,26 @@ export function Game({ snap, room, onLeave, notify }) {
   </div>`;
 }
 
+function TurnPill({ g, myTurn, over, current, timer }) {
+  const left = useSecondsLeft(!over && timer ? timer.deadline : null);
+  const warn = left !== null && left <= 30;
+  // Flag the tab when it's your turn and you're elsewhere, with the clock if there is one.
+  useEffect(() => {
+    const base = 'Trilliant';
+    const update = () => {
+      document.title = myTurn && document.hidden ? `● ${left !== null ? `${clock(left)} · ` : ''}Your turn` : base;
+    };
+    update();
+    document.addEventListener('visibilitychange', update);
+    return () => { document.removeEventListener('visibilitychange', update); document.title = base; };
+  }, [myTurn, left]);
+  return html`<span class=${cls('turnpill', myTurn && 'is-mine', warn && 'is-warn')}>
+    ${over ? 'Game over' : myTurn ? 'Your turn' : `${current.name}’s turn`}
+    ${left !== null ? html`<span class="turnpill__clock" title="Time left this turn">${clock(left)}</span>` : null}
+    ${g.finalRound && !over ? html`<span class="turnpill__final">Last round</span>` : null}
+  </span>`;
+}
+
 function PayLine({ pay }) {
   const items = TOKEN_COLORS.filter((c) => pay[c] > 0);
   if (!items.length) return html`<span>Free with your cards.</span>`;
@@ -407,7 +443,7 @@ function Tray(p) {
     buttons = html`<button type="button" class="btn btn--primary" onClick=${p.onResults}>See results</button>`;
   } else if (!myTurn) {
     title = g.phase === 'discard' ? `${current.name} is returning gems` : g.phase === 'noble' ? `${current.name} is choosing a noble` : `${current.name}’s turn`;
-    const last = [...g.log].reverse().find((e) => ['take', 'reserve', 'buy', 'pass'].includes(e.t));
+    const last = [...g.log].reverse().find((e) => ['take', 'reserve', 'buy', 'pass', 'timeout'].includes(e.t));
     hint = last ? html`<${LogItem} e=${last} players=${g.players} you=${you} tag="span" />` : 'Waiting for their move.';
   } else if (g.phase === 'discard') {
     title = 'Too many gems';

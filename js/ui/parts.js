@@ -183,6 +183,9 @@ export function LogItem({ e, players, you, tag = 'li' }) {
     case 'discard': body = html`${W} put back <${GemList} gems=${e.gems} />`; break;
     case 'noble': key = true; body = html`A noble visited ${w}. +3`; break;
     case 'pass': body = html`${W} had no move and passed.`; break;
+    case 'timeout': body = e.gems
+      ? html`${W} ran out of time. Put back <${GemList} gems=${e.gems} /> for ${e.p === you ? 'you' : 'them'}.`
+      : html`${W} ran out of time. Turn skipped.`; break;
     case 'final': key = true; body = html`${W} reached ${WIN_POINTS}. Last round.`; break;
     case 'end': key = true; body = 'Game over.'; break;
     default: return null;

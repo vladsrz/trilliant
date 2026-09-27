@@ -47,6 +47,16 @@ await until(() => guest.snapshot().chat.some((m) => m.text === 'gl hf'), 'chat r
 assert.ok(host.startGame().ok);
 await until(() => guest.snapshot().game, 'guest gets the game');
 
+// The turn clock reaches the guest, and a timeout on the host shows up there.
+await until(() => guest.snapshot().timer, 'guest gets the clock');
+const left = guest.snapshot().timer.deadline - Date.now();
+assert.ok(left > 170000 && left <= 181000, `clock looks right (${left} ms)`);
+const turnBefore = host.record.game.turn;
+host.deadline = Date.now() + 200;
+await until(() => guest.snapshot().game?.log.at(-1)?.t === 'timeout', 'timeout reaches the guest');
+assert.notEqual(guest.snapshot().game.turn, turnBefore);
+console.log('turn clock synced; a timeout skipped the turn on both sides');
+
 const latencies = [];
 let moves = 0;
 let reloaded = false;

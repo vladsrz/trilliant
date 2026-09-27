@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CARDS, NOBLES, COLORS, TOKEN_COLORS } from '../js/data.js';
 import {
-  newGame, applyAction, viewFor, seededRandom, pointsOf, tokenTotal, bonusesOf, MAX_TOKENS,
+  newGame, applyAction, applyTimeout, viewFor, seededRandom, pointsOf, tokenTotal, bonusesOf, MAX_TOKENS,
 } from '../js/engine.js';
 import { randomAction, greedyAction, legalActions } from '../js/bot.js';
 
@@ -254,6 +254,64 @@ test('rejects junk input without throwing', () => {
   assert.equal(applyAction(s, 'stranger', { type: 'pass' }).ok, false);
 });
 
+test('running out of time skips the turn and changes nothing else', () => {
+  const s = game();
+  const pi = s.turn;
+  const out = applyTimeout(s);
+  assert.ok(out.ok);
+  const t = out.state;
+  assert.equal(t.turn, (pi + 1) % 2);
+  assert.deepEqual(t.bank, s.bank);
+  assert.deepEqual(t.players[pi].tokens, s.players[pi].tokens);
+  assert.equal(t.log.at(-1).t, 'timeout');
+  assert.equal(t.passStreak, 0, 'timeouts are not passes');
+  assert.equal(t.version, s.version + 1);
+});
+
+test('a timeout mid put-back returns the extra gems for the player', () => {
+  let s = game();
+  const pi = s.turn;
+  s = withPlayer(s, pi, { tokens: { white: 4, blue: 2, green: 2, red: 1, black: 0, gold: 1 } });
+  s = act(s, { type: 'take', gems: ['green', 'red', 'black'] });
+  assert.equal(s.phase, 'discard');
+  const t = applyTimeout(s).state;
+  assert.equal(tokenTotal(t.players[pi].tokens), 10);
+  // Held 4 white / 3 green after taking; three go back from the biggest piles: white, white, green.
+  assert.equal(t.players[pi].tokens.white, 2, 'took back from the biggest pile first');
+  assert.equal(t.players[pi].tokens.green, 2);
+  assert.equal(t.players[pi].tokens.gold, 1, 'gold is kept');
+  assert.notEqual(t.turn, pi);
+  assert.equal(t.phase, 'play');
+});
+
+test('a timeout while choosing a noble takes the first one offered', () => {
+  let s = game(2, 8);
+  const qi = s.turn;
+  const pick = (color, n) => CARDS.filter((c) => c.color === color && c.level === 1).slice(0, n).map((c) => c.id);
+  s.nobles = [5, 6, 0];
+  s = withPlayer(s, qi, { cards: [...pick('white', 3), ...pick('blue', 3), ...pick('green', 3), ...pick('red', 2)] });
+  const red = CARDS.find((c) => c.color === 'red' && c.level === 1 && !s.players[qi].cards.includes(c.id));
+  s.board[1][1] = red.id;
+  s = withPlayer(s, qi, { tokens: { ...red.cost, gold: 0 } });
+  s = act(s, { type: 'buy', card: red.id });
+  assert.equal(s.phase, 'noble');
+  const first = s.pending.options[0];
+  const t = applyTimeout(s).state;
+  assert.deepEqual(t.players[qi].nobles, [first]);
+  assert.notEqual(t.turn, qi);
+});
+
+test('a timeout by the last seat in the final round ends the game', () => {
+  let s = game();
+  s = act(s, { type: 'take', gems: ['white', 'blue', 'green'] });
+  const last = s.turn;
+  s = withPlayer(s, (last + 1) % 2, { cards: CARDS.filter((c) => c.points === 5).slice(0, 3).map((c) => c.id) });
+  s.finalRound = true;
+  const t = applyTimeout(s).state;
+  assert.equal(t.phase, 'over');
+  assert.equal(applyTimeout(t).ok, false);
+});
+
 // ---------- whole-game simulation ----------
 
 function checkInvariants(s, n) {
@@ -309,9 +367,15 @@ test('thousands of random games keep every invariant', () => {
     const policy = seed % 2 ? greedyAction : randomAction;
     while (s.phase !== 'over' && steps < 3000) {
       const pi = s.turn;
-      const action = policy(s, pi, rand);
-      const res = applyAction(s, s.players[pi].id, action);
-      assert.ok(res.ok, `seed ${seed} step ${steps}: ${JSON.stringify(action)} -> ${res.error}`);
+      let res;
+      if (rand() < 0.04) {
+        res = applyTimeout(s);
+        assert.ok(res.ok, `seed ${seed} step ${steps}: timeout -> ${res.error}`);
+      } else {
+        const action = policy(s, pi, rand);
+        res = applyAction(s, s.players[pi].id, action);
+        assert.ok(res.ok, `seed ${seed} step ${steps}: ${JSON.stringify(action)} -> ${res.error}`);
+      }
       s = res.state;
       checkInvariants(s, n);
       if (steps % 7 === 0) checkViewSecrecy(s);

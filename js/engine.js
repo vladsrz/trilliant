@@ -315,6 +315,52 @@ function chooseNoble(s, pi, noble) {
   endTurn(s);
 }
 
+// ---------- running out of time ----------
+
+// The host plays this for the current player when their turn clock hits zero.
+// The turn is skipped; a half-finished turn is finished for them (extra gems
+// put back, the first eligible noble chosen). Timeouts don't count as passes,
+// so two idle players can't end the game by accident.
+export function applyTimeout(state) {
+  if (state.phase === 'over') return { ok: false, error: 'The game is over.' };
+  const s = structuredClone(state);
+  const pi = s.turn;
+  const p = s.players[pi];
+  const entry = { t: 'timeout', p: pi };
+  if (s.phase === 'discard') {
+    const back = autoDiscard(p.tokens, s.pending.count);
+    for (const c of TOKEN_COLORS) { p.tokens[c] -= back[c]; s.bank[c] += back[c]; }
+    entry.gems = back;
+    s.log.push(entry);
+    const b = bonusesOf(p);
+    const eligible = s.nobles.filter((id) => nobleFits(NOBLES[id], b));
+    if (eligible.length) awardNoble(s, pi, eligible[0]);
+  } else if (s.phase === 'noble') {
+    s.log.push(entry);
+    awardNoble(s, pi, s.pending.options[0]);
+  } else {
+    s.log.push(entry);
+  }
+  endTurn(s);
+  s.version += 1;
+  if (s.log.length > LOG_KEEP) s.log.splice(0, s.log.length - LOG_KEEP);
+  return { ok: true, state: s };
+}
+
+// Put back from whichever colour the player holds most of; gold goes last.
+function autoDiscard(tokens, count) {
+  const left = { ...tokens };
+  const back = emptyTokens();
+  for (let i = 0; i < count; i++) {
+    let pick = null;
+    for (const c of COLORS) if (left[c] > 0 && (!pick || left[c] > left[pick])) pick = c;
+    if (!pick) pick = GOLD;
+    left[pick] -= 1;
+    back[pick] += 1;
+  }
+  return back;
+}
+
 // ---------- turn flow ----------
 
 function afterMainAction(s, pi) {

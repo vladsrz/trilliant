@@ -13,7 +13,7 @@
 
 import { Bus } from './bus.js';
 import { fingerprint, pairKey, sealText, openText, randomId } from './crypto.js';
-import { newGame, applyAction, viewFor, MAX_PLAYERS, MIN_PLAYERS } from '../engine.js';
+import { newGame, applyAction, applyTimeout, viewFor, MAX_PLAYERS, MIN_PLAYERS } from '../engine.js';
 import { saveHostRecord } from './identity.js';
 import { every } from './ticker.js';
 
@@ -25,6 +25,10 @@ const CHAT_KEEP = 120;
 const CLIENTS_MAX = 24;
 const CHAT_SEND = 60;
 export const NAME_MAX = 20;
+// Turn timer choices in seconds (0 = off). Geminist runs about 3 minutes a turn.
+export const TIMER_CHOICES = [0, 60, 120, 180];
+const DEFAULT_TURN_SECONDS = 180;
+const GRACE_MS = 30000;
 export const CHAT_MAX = 240;
 
 export function cleanName(name) {
@@ -47,6 +51,13 @@ function plausibleSync(m) {
   return isObj(g) && Array.isArray(g.players) && g.players.length >= 2 && g.players.length <= MAX_PLAYERS
     && isObj(g.board) && isObj(g.bank) && isObj(g.deckCounts) && Array.isArray(g.log) && Array.isArray(g.nobles)
     && Number.isInteger(g.version) && Number.isInteger(g.turn) && Number.isInteger(g.you);
+}
+
+function parseTimer(t) {
+  if (!t || typeof t !== 'object' || !TIMER_CHOICES.includes(t.seconds) || !t.seconds) return null;
+  const ms = Number(t.remainingMs);
+  if (!Number.isFinite(ms) || ms < 0 || ms > t.seconds * 1000 + GRACE_MS) return null;
+  return { seconds: t.seconds, deadline: Date.now() + ms };
 }
 
 class Emitter {
@@ -90,9 +101,11 @@ export class HostRoom extends Emitter {
       game: null,
       chat: [],
       tally: {},
+      settings: { turnSeconds: DEFAULT_TURN_SECONDS },
       rev: 1,
       createdAt: Date.now(),
     };
+    this.deadline = null;
     this.clients = new Map();
     this.bus = new Bus({
       topic: `trilliant/v1/${room.id}`,
@@ -108,10 +121,15 @@ export class HostRoom extends Emitter {
     this.persist();
     this.bus.start();
     this.stopTicks = every(HEARTBEAT_MS, () => this.tick());
+    this.stopClock = every(1000, () => this.checkClock());
+    // The clock doesn't run while the host is away: a reopened game gives the
+    // current player a fresh turn instead of skipping them on the spot.
+    this.restartClock();
   }
 
   stop() {
     this.stopTicks?.();
+    this.stopClock?.();
     this.bus.send('bye', {}).catch(() => {});
     setTimeout(() => this.bus.stop(), 150);
   }
@@ -131,8 +149,54 @@ export class HostRoom extends Emitter {
     return {
       status: r.status,
       max: MAX_PLAYERS,
+      turnSeconds: this.turnSeconds,
       seats: r.seats.map((s) => ({ id: s.id, name: s.name, host: s.id === r.hostId, online: this.isOnline(s.id) })),
     };
+  }
+
+  // ----- turn clock -----
+
+  get turnSeconds() {
+    const t = this.record.settings?.turnSeconds;
+    return TIMER_CHOICES.includes(t) ? t : DEFAULT_TURN_SECONDS;
+  }
+
+  restartClock() {
+    const playing = this.record.status === 'playing' && this.record.game;
+    this.deadline = playing && this.turnSeconds ? Date.now() + this.turnSeconds * 1000 : null;
+  }
+
+  // A new player gets a full clock. A player still putting gems back or
+  // choosing a noble keeps theirs, but gets at least a short grace period.
+  clockAfterMove(prevTurn) {
+    const g = this.record.game;
+    if (!g || this.record.status !== 'playing') this.deadline = null;
+    else if (g.turn !== prevTurn) this.restartClock();
+    else if (this.deadline) this.deadline = Math.max(this.deadline, Date.now() + GRACE_MS);
+  }
+
+  checkClock() {
+    const r = this.record;
+    if (r.status !== 'playing' || !r.game || !this.deadline || Date.now() < this.deadline) return;
+    const prevTurn = r.game.turn;
+    const out = applyTimeout(r.game);
+    if (!out.ok) { this.deadline = null; return; }
+    r.game = out.state;
+    if (r.game.phase === 'over') this.finishGame();
+    this.clockAfterMove(prevTurn);
+    this.bump();
+  }
+
+  timerInfo() {
+    if (this.record.status !== 'playing' || !this.deadline) return null;
+    return { seconds: this.turnSeconds, remainingMs: Math.max(0, this.deadline - Date.now()) };
+  }
+
+  setTimer(seconds) {
+    const r = this.record;
+    if (r.status === 'playing' || !TIMER_CHOICES.includes(seconds) || seconds === this.turnSeconds) return;
+    r.settings = { ...(r.settings || {}), turnSeconds: seconds };
+    this.bump();
   }
 
   tick() {
@@ -258,11 +322,13 @@ export class HostRoom extends Emitter {
       return { ok: true };
     }
     if (r.status !== 'playing' || !r.game) return { ok: false, error: 'No game in progress.' };
-    if (base !== undefined && base !== r.game.version) return { ok: false, error: 'The table changed. Try that again.' };
+    if (base !== undefined && base !== r.game.version) return { ok: false, error: 'The game moved on. Try that again.' };
+    const prevTurn = r.game.turn;
     const out = applyAction(r.game, playerId, action);
     if (!out.ok) return out;
     r.game = out.state;
     if (r.game.phase === 'over') this.finishGame();
+    this.clockAfterMove(prevTurn);
     return { ok: true };
   }
 
@@ -289,6 +355,7 @@ export class HostRoom extends Emitter {
     if (r.seats.length < MIN_PLAYERS) return { ok: false, error: 'Waiting for at least one more player.' };
     r.game = newGame(r.seats.map((s) => ({ id: s.id, name: s.name })));
     r.status = 'playing';
+    this.restartClock();
     this.chatSystem(`New game. ${r.game.players[r.game.start].name} goes first.`);
     this.bump();
     return { ok: true };
@@ -298,6 +365,7 @@ export class HostRoom extends Emitter {
     const r = this.record;
     r.status = 'lobby';
     r.game = null;
+    this.deadline = null;
     this.bump();
   }
 
@@ -354,6 +422,7 @@ export class HostRoom extends Emitter {
       game: seated && r.game ? viewFor(r.game, id) : null,
       chat: seated ? r.chat.slice(-CHAT_SEND) : [],
       tally: r.tally,
+      timer: seated ? this.timerInfo() : null,
     };
   }
 
@@ -385,6 +454,7 @@ export class HostRoom extends Emitter {
       game: r.game ? viewFor(r.game, r.hostId) : null,
       chat: r.chat.slice(-CHAT_SEND),
       tally: r.tally,
+      timer: r.status === 'playing' && this.deadline ? { seconds: this.turnSeconds, deadline: this.deadline } : null,
       rev: r.rev,
     };
   }
@@ -408,6 +478,7 @@ export class GuestRoom extends Emitter {
     this.game = null;
     this.chat = [];
     this.tally = {};
+    this.timer = null;
     this.lastHost = 0;
     this.pending = new Map();
     this.bus = new Bus({
@@ -486,6 +557,7 @@ export class GuestRoom extends Emitter {
       this.game = msg.game;
       this.chat = Array.isArray(msg.chat) ? msg.chat : [];
       this.tally = msg.tally || {};
+      this.timer = parseTimer(msg.timer);
       this.emit();
     } else if (env.t === 'res') {
       const p = this.pending.get(msg.aid);
@@ -546,6 +618,7 @@ export class GuestRoom extends Emitter {
       game: this.game,
       chat: this.chat,
       tally: this.tally,
+      timer: this.timer,
       rev: this.rev,
     };
   }
