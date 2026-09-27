@@ -1,0 +1,223 @@
+import { html, render, useState, useEffect, useRef, useCallback } from '../vendor/preact-htm.js';
+import { injectSprite } from './ui/gems.js';
+import { Home, Lobby, Game, Notice, Connecting } from './ui/screens.js';
+import { roomFromSecret, newRoomSecret } from './net/crypto.js';
+import { HostRoom, GuestRoom, cleanName } from './net/room.js';
+import {
+  browserStorage, resolveIdentity, holdIdentity, loadHostRecord, listTables, rememberTable, forgetTable, loadName, saveName,
+} from './net/identity.js';
+
+const storage = browserStorage();
+
+const ADJECTIVES = ['Lucky', 'Sly', 'Gilded', 'Quiet', 'Bold', 'Clever', 'Rogue', 'Polished', 'Shrewd', 'Velvet', 'Midnight', 'Brisk', 'Dapper', 'Canny', 'Nimble'];
+const NOUNS = ['Magpie', 'Jeweler', 'Prospector', 'Merchant', 'Cutter', 'Miner', 'Baron', 'Duchess', 'Smuggler', 'Trader', 'Banker', 'Collector', 'Courier', 'Setter'];
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+function defaultName() {
+  let n = loadName(storage);
+  if (!n) {
+    n = `${pick(ADJECTIVES)} ${pick(NOUNS)}`;
+    saveName(storage, n);
+  }
+  return n;
+}
+
+// Invite links look like  …/#<22-char room secret>.<12-char host id>
+function parseHash() {
+  const m = /^#?([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{12})$/.exec(location.hash);
+  return m ? { secret: m[1], hostId: m[2] } : null;
+}
+
+function useToast() {
+  const [toast, setToast] = useState(null);
+  const timer = useRef(null);
+  const notify = useCallback((text) => {
+    clearTimeout(timer.current);
+    setToast(text);
+    timer.current = setTimeout(() => setToast(null), 2600);
+  }, []);
+  return [toast, notify];
+}
+
+// ======================================================================
+
+function App() {
+  const [route, setRoute] = useState(parseHash);
+  const [bad, setBad] = useState(() => location.hash.length > 1 && !parseHash());
+  const [toast, notify] = useToast();
+
+  useEffect(() => {
+    const onHash = () => { setRoute(parseHash()); setBad(location.hash.length > 1 && !parseHash()); };
+    addEventListener('hashchange', onHash);
+    // Coming back from the back/forward cache leaves sockets dead: reload clean.
+    const onShow = (e) => { if (e.persisted) location.reload(); };
+    addEventListener('pageshow', onShow);
+    return () => { removeEventListener('hashchange', onHash); removeEventListener('pageshow', onShow); };
+  }, []);
+
+  let screen;
+  if (bad) {
+    screen = html`<${Notice} title="That link doesn’t open a table"
+      actions=${html`<a class="btn btn--primary" href="./#">Back to start</a>`}>
+      The invite link looks cut off. Ask for it again, or open your own table.</${Notice}>`;
+  } else if (route) {
+    screen = html`<${RoomScreen} key=${route.secret + route.hostId} ...${route} notify=${notify} />`;
+  } else {
+    screen = html`<${HomeScreen} notify=${notify} />`;
+  }
+  return html`${screen}${toast ? html`<div class="toast" role="status">${toast}</div>` : null}`;
+}
+
+// ======================================================================
+
+function HomeScreen({ notify }) {
+  const [name, setName] = useState(defaultName);
+  const [tables, setTables] = useState(() => listTables(storage));
+  const [busy, setBusy] = useState(false);
+
+  const onName = (v) => { setName(v); if (v.trim()) saveName(storage, cleanName(v)); };
+  const onCreate = async () => {
+    setBusy(true);
+    try {
+      saveName(storage, cleanName(name));
+      const secret = newRoomSecret();
+      const room = await roomFromSecret(secret);
+      const { identity } = await resolveIdentity(storage, room.id);
+      location.hash = `${secret}.${identity.id}`;
+    } catch {
+      notify('Couldn’t open a table in this browser.');
+      setBusy(false);
+    }
+  };
+  const onResume = (t) => { location.hash = `${t.secret}.${t.hostId}`; };
+  const onForget = (t) => { forgetTable(storage, t.roomId); setTables(listTables(storage)); };
+
+  useEffect(() => { document.title = 'Facet · gem trading for 2–4 players'; }, []);
+  return html`<${Home} name=${name} onName=${onName} onCreate=${onCreate} tables=${tables} onResume=${onResume} onForget=${onForget} busy=${busy} />`;
+}
+
+// ======================================================================
+
+function RoomScreen({ secret, hostId, notify }) {
+  const [phase, setPhase] = useState('connecting'); // connecting | conflict | ready | broken
+  const [snap, setSnap] = useState(null);
+  const [forceNew, setForceNew] = useState(false);
+  const [waited, setWaited] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [name, setName] = useState(defaultName);
+  const roomRef = useRef(null);
+
+  useEffect(() => {
+    let dead = false;
+    let release = null;
+    let unsub = null;
+    let room = null;
+    let titleKey = '';
+    setWaited(false);
+    (async () => {
+      let r;
+      try { r = await roomFromSecret(secret); } catch { setPhase('broken'); return; }
+      const res = await resolveIdentity(storage, r.id, { forceNew });
+      if (dead) return;
+      if (res.conflict) { setPhase('conflict'); return; }
+      const { identity } = res;
+      const myName = defaultName();
+      room = identity.id === hostId
+        ? new HostRoom({ room: r, secret, identity, name: myName, record: loadHostRecord(storage, r.id), storage })
+        : new GuestRoom({ room: r, hostId, identity, name: myName });
+      roomRef.current = room;
+      release = holdIdentity(storage, r.id, identity.id);
+      const refresh = () => {
+        const s = room.snapshot();
+        setSnap(s);
+        // Keep "Your tables" on the start page labelled with who's at the table.
+        const others = (s.lobby?.seats || []).filter((x) => x.id !== s.selfId).map((x) => x.name);
+        const title = others.length ? `Table with ${others.join(', ')}` : s.role === 'host' ? 'Your table' : '';
+        if (title !== titleKey) {
+          titleKey = title;
+          rememberTable(storage, { roomId: r.id, secret, hostId, role: room.role, title });
+        }
+      };
+      unsub = room.subscribe(refresh);
+      room.start();
+      refresh();
+      setPhase('ready');
+    })();
+
+    const wake = () => { if (document.visibilityState === 'visible') roomRef.current?.wake(); };
+    const bye = () => roomRef.current?.stop();
+    const timer = setTimeout(() => setWaited(true), 7000);
+    document.addEventListener('visibilitychange', wake);
+    addEventListener('online', wake);
+    addEventListener('pagehide', bye);
+    return () => {
+      dead = true;
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', wake);
+      removeEventListener('online', wake);
+      removeEventListener('pagehide', bye);
+      unsub?.();
+      release?.();
+      room?.stop();
+      roomRef.current = null;
+    };
+  }, [secret, hostId, forceNew]);
+
+  const room = roomRef.current;
+  const goHome = () => { location.hash = ''; };
+  const onLeave = () => setConfirmLeave(true);
+  const onRename = (v) => {
+    const clean = cleanName(v);
+    saveName(storage, clean);
+    setName(clean);
+    room?.setName(clean);
+  };
+
+  if (phase === 'broken') {
+    return html`<${Notice} title="That link doesn’t open a table" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
+      The invite link looks damaged. Ask for it again.</${Notice}>`;
+  }
+  if (phase === 'conflict') {
+    return html`<${Notice} title="This table is open in another tab"
+      actions=${html`<button class="btn" onClick=${goHome}>Back to start</button>
+        <button class="btn btn--primary" onClick=${() => { setPhase('connecting'); setForceNew(true); }}>Join as another player</button>`}>
+      Keep playing in that tab, or join from this one as a separate player.</${Notice}>`;
+  }
+  if (phase !== 'ready' || !snap || !room) return html`<${Connecting} snap=${snap} waited=${waited} />`;
+
+  let screen;
+  const lobby = snap.lobby;
+  if (!snap.synced || !lobby) {
+    screen = html`<${Connecting} snap=${snap} waited=${waited} />`;
+  } else if (snap.seated && snap.game && lobby.status !== 'lobby') {
+    screen = html`<${Game} snap=${snap} room=${room} onLeave=${onLeave} notify=${notify} />`;
+  } else if (lobby.status === 'lobby') {
+    screen = html`<${Lobby} snap=${snap} room=${room} name=${name} onRename=${onRename} onLeave=${onLeave} notify=${notify} />`;
+  } else {
+    const hostName = lobby.seats.find((s) => s.host)?.name || 'The host';
+    screen = html`<${Notice} title="This table is mid-game" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
+      ${hostName} is playing with ${lobby.seats.filter((s) => !s.host).map((s) => s.name).join(', ') || 'someone'} right now. Keep this page open and you’ll get a seat when they return to the lobby.</${Notice}>`;
+  }
+
+  const hostName = lobby?.seats.find((s) => s.host)?.name || 'The host';
+  return html`
+    ${screen}
+    ${snap.role === 'guest' && snap.synced && !snap.hostOnline ? html`<div class="banner" role="status">${hostName} is offline. The table resumes when they’re back.</div>` : null}
+    ${snap.link && !snap.link.up && snap.synced ? html`<div class="banner" role="status">Connection lost. Reconnecting…</div>` : null}
+    ${confirmLeave ? html`<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="leave-title">
+      <section class="panel sheet notice">
+        <h2 class="sheet__title" id="leave-title">Leave the table?</h2>
+        <p class="sheet__sub">${snap.role === 'host'
+          ? 'Your browser runs this table, so it pauses until you open it again. It stays under “Your tables” on the start page.'
+          : 'You keep your seat. Open the same link to come back.'}</p>
+        <div class="sheet__actions">
+          <button class="btn" onClick=${() => setConfirmLeave(false)}>Stay</button>
+          <button class="btn btn--primary" onClick=${goHome}>Leave</button>
+        </div>
+      </section>
+    </div>` : null}`;
+}
+
+// ======================================================================
+
+injectSprite();
+render(html`<${App} />`, document.getElementById('app'));

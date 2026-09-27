@@ -15,6 +15,7 @@ import { Bus } from './bus.js';
 import { fingerprint, pairKey, sealText, openText, randomId } from './crypto.js';
 import { newGame, applyAction, viewFor, MAX_PLAYERS, MIN_PLAYERS } from '../engine.js';
 import { saveHostRecord } from './identity.js';
+import { every } from './ticker.js';
 
 const HEARTBEAT_MS = 3000;
 const ONLINE_MS = 10000;
@@ -93,11 +94,11 @@ export class HostRoom extends Emitter {
   start() {
     this.persist();
     this.bus.start();
-    this.timer = setInterval(() => this.tick(), HEARTBEAT_MS);
+    this.stopTicks = every(HEARTBEAT_MS, () => this.tick());
   }
 
   stop() {
-    clearInterval(this.timer);
+    this.stopTicks?.();
     this.bus.send('bye', {}).catch(() => {});
     setTimeout(() => this.bus.stop(), 150);
   }
@@ -400,11 +401,11 @@ export class GuestRoom extends Emitter {
 
   start() {
     this.bus.start();
-    this.timer = setInterval(() => this.tick(), HEARTBEAT_MS);
+    this.stopTicks = every(HEARTBEAT_MS, () => this.tick());
   }
 
   stop() {
-    clearInterval(this.timer);
+    this.stopTicks?.();
     for (const p of this.pending.values()) { clearInterval(p.timer); p.resolve({ ok: false, error: 'Left the table.' }); }
     this.pending.clear();
     this.bus.send('bye', {}).catch(() => {});
