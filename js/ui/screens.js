@@ -19,6 +19,12 @@ const TIMER_OPTIONS = [
 const PencilIcon = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>`;
 const CrossIcon = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>`;
 
+// A round badge with the player's first letter: marks player rows at a glance.
+function Avatar({ name, me, off }) {
+  const letter = Array.from((name || '').trim())[0]?.toUpperCase() || '?';
+  return html`<span class=${cls('avatar', me && 'avatar--me', off && 'is-off')} aria-hidden="true">${letter}</span>`;
+}
+
 // Points-to-win slider: shows the value while dragging, tells the room only on release.
 function TargetSlider({ value, onCommit }) {
   const [draft, setDraft] = useState(value);
@@ -177,13 +183,14 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
           const mine = s.id === snap.selfId;
           const wins = snap.tally?.[s.id] || 0;
           if (mine && editing) {
-            return html`<li class="player"><form class="rename" onSubmit=${saveName}>
+            return html`<li class="player"><${Avatar} name=${draft || s.name} me /><form class="rename" onSubmit=${saveName}>
               <input class="field" aria-label="Your name" value=${draft} maxlength=${NAME_MAX} autofocus onInput=${(e) => setDraft(e.currentTarget.value)} />
               <button class="btn btn--small btn--primary" type="submit" disabled=${!draft.trim()}>Save</button>
               <button class="btn btn--small btn--ghost" type="button" onClick=${() => { setDraft(name); setEditing(false); }}>Cancel</button>
             </form></li>`;
           }
           return html`<li class="player">
+            <${Avatar} name=${s.name} me=${mine} off=${!s.online} />
             <span class="player__name">${s.name}${mine ? html` <span class="seat__you">(you)</span>` : null}</span>
             ${mine ? html`<button type="button" class="icon-btn" title="Change name" aria-label="Change name" onClick=${() => setEditing(true)}>${PencilIcon}</button>` : null}
             <span class="player__meta">
@@ -193,7 +200,7 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
             ${isHost && !s.host ? html`<button type="button" class="icon-btn" title=${`Remove ${s.name}`} aria-label=${`Remove ${s.name}`} onClick=${() => room.removeSeat(s.id)}>${CrossIcon}</button>` : null}
           </li>`;
         })}
-        ${open > 0 ? html`<li class="player player--empty">${canStart ? `Room for ${open} more` : 'Waiting for players…'}</li>` : null}
+        ${open > 0 ? html`<li class="player player--empty"><span class="avatar avatar--empty" aria-hidden="true"></span>${canStart ? `Room for ${open} more` : 'Waiting for players…'}</li>` : null}
       </ul>
 
       <div class="settings">

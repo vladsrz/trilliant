@@ -192,6 +192,10 @@ button { cursor: pointer; }
 .player__name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .player__meta { flex: 1; display: flex; justify-content: flex-end; gap: 10px; font-size: 12.5px; color: var(--text-mute); }
 .player--empty { color: var(--text-faint); font-size: 14px; }
+.avatar { display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; margin-right: 6px; border-radius: 50%; background: rgba(240, 231, 215, 0.13); color: var(--ivory); font: 800 13px/1 var(--font-ui); }
+.avatar--me { background: #d4b06a; color: #241809; }
+.avatar.is-off { opacity: 0.45; }
+.avatar--empty { background: transparent; border: 1.5px dashed rgba(240, 231, 215, 0.24); }
 .player .rename { display: flex; gap: 8px; width: 100%; }
 .player .rename .field { flex: 1; min-height: 34px; font-size: 15px; }
 .settings { margin-top: 18px; display: grid; gap: 14px; }
