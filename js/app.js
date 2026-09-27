@@ -102,7 +102,7 @@ function HomeScreen({ notify }) {
   const onResume = (t) => { location.hash = `${t.secret}.${t.hostId}`; };
   const onForget = (t) => { forgetTable(storage, t.roomId); setTables(listTables(storage)); };
 
-  useEffect(() => { document.title = 'Facet · gem trading for 2–4 players'; }, []);
+  useEffect(() => { document.title = 'Trilliant · gem trading for 2–4 players'; }, []);
   return html`<${Home} name=${name} onName=${onName} onCreate=${onCreate} tables=${tables} onResume=${onResume} onForget=${onForget} busy=${busy} />`;
 }
 

@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <polygon points="21,4 43,4 52,13 52,51 43,60 21,60 12,51 12,13" fill="#139f69" stroke="#03291a" stroke-width="2"/>
-  <polygon points="26,14 38,14 42,18 42,46 38,50 26,50 22,46 22,18" fill="#45cb91"/>
-  <polygon points="21,4 43,4 38,14 26,14" fill="#a6f2cc"/>
-  <polygon points="52,13 52,51 42,46 42,18" fill="#0a6843"/>
-  <polygon points="43,60 21,60 26,50 38,50" fill="#053b26"/>
+  <path d="M32 3 Q49.6 25.6 61 53 Q32 58.4 3 53 Q14.4 25.6 32 3Z" fill="#d2304a" stroke="#410511" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M32 21 L43.6 41 L20.4 41Z" fill="#f1697d"/>
+  <path d="M32 3 L32 21 L20.4 41 L3 53 Q14.4 25.6 32 3Z" fill="#ffb5c0" opacity="0.55"/>
+  <path d="M61 53 L43.6 41 L20.4 41 L3 53 Q32 58.4 61 53Z" fill="#5c0918" opacity="0.55"/>
 </svg>

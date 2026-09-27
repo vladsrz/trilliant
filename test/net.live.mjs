@@ -25,7 +25,7 @@ const hostId = await createIdentity();
 const guestId = await createIdentity();
 assert.equal(hostId.id, await fingerprint(hostId.pub));
 
-let host = new HostRoom({ room, secret, identity: hostId, name: 'Vlad', storage: hostStorage });
+let host = new HostRoom({ room, secret, identity: hostId, name: 'Ana', storage: hostStorage });
 let guest = new GuestRoom({ room, hostId: hostId.id, identity: guestId, name: 'Sam' });
 host.start();
 guest.start();

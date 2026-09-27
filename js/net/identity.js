@@ -2,6 +2,7 @@
 // app keeps. Storage is injected so the same code runs in tests.
 
 import { createIdentity, loadIdentity, randomId } from './crypto.js';
+import { every } from './ticker.js';
 
 const TAB_TOKEN = randomId(6);
 const LIVE_MS = 5000;
@@ -17,7 +18,7 @@ function memoryStore() {
 
 function safe(store) {
   try {
-    const probe = '__facet_probe__';
+    const probe = '__trilliant_probe__';
     store.setItem(probe, '1');
     store.removeItem(probe);
     return store;
@@ -45,15 +46,15 @@ const writeJSON = (store, key, value) => {
 // ---------- identity per room ----------
 
 function isLiveElsewhere(storage, roomId, id) {
-  const rec = readJSON(storage.local, `facet:live:${roomId}`);
+  const rec = readJSON(storage.local, `trilliant:live:${roomId}`);
   return !!rec && rec.id === id && rec.tab !== TAB_TOKEN && Date.now() - rec.at < LIVE_MS;
 }
 
 // Returns { identity } or { conflict: true } when this browser's identity for
 // the room is already in use by another open tab.
 export async function resolveIdentity(storage, roomId, { forceNew = false } = {}) {
-  const tabKey = `facet:tab:${roomId}`;
-  const localKey = `facet:id:${roomId}`;
+  const tabKey = `trilliant:tab:${roomId}`;
+  const localKey = `trilliant:id:${roomId}`;
   const mine = readJSON(storage.session, tabKey);
   if (mine && !forceNew) return { identity: await loadIdentity(mine) };
   const shared = readJSON(storage.local, localKey);
@@ -71,39 +72,39 @@ export async function resolveIdentity(storage, roomId, { forceNew = false } = {}
 
 // Keep a heartbeat so a second tab can tell the identity is taken.
 export function holdIdentity(storage, roomId, id) {
-  const beat = () => writeJSON(storage.local, `facet:live:${roomId}`, { id, tab: TAB_TOKEN, at: Date.now() });
+  const beat = () => writeJSON(storage.local, `trilliant:live:${roomId}`, { id, tab: TAB_TOKEN, at: Date.now() });
   beat();
-  const timer = setInterval(beat, 2000);
+  const stop = every(2000, beat);
   return () => {
-    clearInterval(timer);
-    const rec = readJSON(storage.local, `facet:live:${roomId}`);
-    if (rec && rec.tab === TAB_TOKEN) storage.local.removeItem(`facet:live:${roomId}`);
+    stop();
+    const rec = readJSON(storage.local, `trilliant:live:${roomId}`);
+    if (rec && rec.tab === TAB_TOKEN) storage.local.removeItem(`trilliant:live:${roomId}`);
   };
 }
 
 // ---------- host records and recent tables ----------
 
-export const loadHostRecord = (storage, roomId) => readJSON(storage.local, `facet:room:${roomId}`);
-export const saveHostRecord = (storage, roomId, record) => writeJSON(storage.local, `facet:room:${roomId}`, record);
+export const loadHostRecord = (storage, roomId) => readJSON(storage.local, `trilliant:room:${roomId}`);
+export const saveHostRecord = (storage, roomId, record) => writeJSON(storage.local, `trilliant:room:${roomId}`, record);
 
 export function listTables(storage) {
-  const list = readJSON(storage.local, 'facet:tables');
+  const list = readJSON(storage.local, 'trilliant:tables');
   return Array.isArray(list) ? list : [];
 }
 
 export function rememberTable(storage, entry) {
   const list = listTables(storage).filter((t) => t.roomId !== entry.roomId);
   list.unshift({ ...entry, at: Date.now() });
-  writeJSON(storage.local, 'facet:tables', list.slice(0, 8));
+  writeJSON(storage.local, 'trilliant:tables', list.slice(0, 8));
 }
 
 export function forgetTable(storage, roomId) {
-  writeJSON(storage.local, 'facet:tables', listTables(storage).filter((t) => t.roomId !== roomId));
-  for (const k of [`facet:room:${roomId}`, `facet:id:${roomId}`]) storage.local.removeItem(k);
+  writeJSON(storage.local, 'trilliant:tables', listTables(storage).filter((t) => t.roomId !== roomId));
+  for (const k of [`trilliant:room:${roomId}`, `trilliant:id:${roomId}`]) storage.local.removeItem(k);
 }
 
 export const loadName = (storage) => {
-  const n = storage.local.getItem('facet:name');
+  const n = storage.local.getItem('trilliant:name');
   return typeof n === 'string' ? n : '';
 };
-export const saveName = (storage, name) => storage.local.setItem('facet:name', name);
+export const saveName = (storage, name) => storage.local.setItem('trilliant:name', name);

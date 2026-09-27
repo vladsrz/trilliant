@@ -95,7 +95,7 @@ export class HostRoom extends Emitter {
     };
     this.clients = new Map();
     this.bus = new Bus({
-      topic: `facet/v1/${room.id}`,
+      topic: `trilliant/v1/${room.id}`,
       key: room.key,
       selfId: identity.id,
       relays,
@@ -411,7 +411,7 @@ export class GuestRoom extends Emitter {
     this.lastHost = 0;
     this.pending = new Map();
     this.bus = new Bus({
-      topic: `facet/v1/${room.id}`,
+      topic: `trilliant/v1/${room.id}`,
       key: room.key,
       selfId: identity.id,
       relays,

@@ -1,4 +1,4 @@
-/* Facet. A plain dark table, flat ivory cards, a little brass for controls.
+/* Trilliant. A plain dark table, flat ivory cards, a little brass for controls.
    The cut gems are the only saturated colour on the page. */
 
 :root {
@@ -53,7 +53,7 @@ body {
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
-#facet-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+#trilliant-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* ---------- shared bits ---------- */

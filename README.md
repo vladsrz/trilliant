@@ -1,6 +1,10 @@
-# Facet
+# Trilliant
 
 Online gem-trading card game for 2–4 players, played by the rules of Splendor. Open a table, send the link, play in the browser. No accounts, no server to run.
+
+**Play:** https://vladsrz.github.io/trilliant/
+
+A trilliant is the triangular gem cut; here it's the ruby.
 
 Fan-made. Not affiliated with Space Cowboys or Asmodee. No art or text from the published game; card costs and nobles are the base-game values (cross-checked against three independent public transcriptions and the rulebook example).
 

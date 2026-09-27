@@ -164,9 +164,9 @@ export const GEM_SPRITE = `<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="
 </svg>`;
 
 export function injectSprite(doc = document) {
-  if (doc.getElementById('facet-sprite')) return;
+  if (doc.getElementById('trilliant-sprite')) return;
   const holder = doc.createElement('div');
-  holder.id = 'facet-sprite';
+  holder.id = 'trilliant-sprite';
   holder.innerHTML = GEM_SPRITE; // static markup generated above, no user data
   doc.body.prepend(holder);
 }

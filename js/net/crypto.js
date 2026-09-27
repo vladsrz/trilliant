@@ -49,8 +49,8 @@ export function newRoomSecret() {
 export async function roomFromSecret(secret) {
   const raw = fromB64u(secret);
   if (raw.length !== 16) throw new Error('bad room secret');
-  const id = b64u(await sha256('facet/topic/', raw)).slice(0, 16);
-  const keyBytes = await sha256('facet/key/', raw);
+  const id = b64u(await sha256('trilliant/topic/', raw)).slice(0, 16);
+  const keyBytes = await sha256('trilliant/key/', raw);
   const key = await subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt', 'decrypt']);
   return { id, key, secretBytes: raw };
 }
@@ -88,7 +88,7 @@ export async function openText(key, text) {
 const ECDH = { name: 'ECDH', namedCurve: 'P-256' };
 
 export async function fingerprint(pubB64) {
-  return b64u(await sha256('facet/id/', fromB64u(pubB64))).slice(0, 12);
+  return b64u(await sha256('trilliant/id/', fromB64u(pubB64))).slice(0, 12);
 }
 
 export async function createIdentity() {
@@ -111,7 +111,7 @@ export async function pairKey(identity, peerPub, roomSecretBytes) {
   const hk = await subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']);
   const ids = [identity.id, await fingerprint(peerPub)].sort().join('|');
   return subtle.deriveKey(
-    { name: 'HKDF', hash: 'SHA-256', salt: roomSecretBytes, info: enc.encode(`facet/pair/${ids}`) },
+    { name: 'HKDF', hash: 'SHA-256', salt: roomSecretBytes, info: enc.encode(`trilliant/pair/${ids}`) },
     hk,
     { name: 'AES-GCM', length: 256 },
     false,

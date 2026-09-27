@@ -30,7 +30,7 @@ export function Home({ name, onName, onCreate, tables, onResume, onForget, busy 
       <div class="home__gems" aria-hidden="true">
         ${['white', 'blue', 'green', 'red', 'black', 'gold'].map((c) => html`<${Gem} color=${c} />`)}
       </div>
-      <h1 class="home__mark">Facet</h1>
+      <h1 class="home__mark">Trilliant</h1>
       <p class="home__lede">Trade gems, buy cards, win nobles. First to ${WIN_POINTS} points wins. Open a table and send the link to a friend.</p>
       <form class="panel home__form" onSubmit=${submit}>
         <div>
@@ -205,8 +205,8 @@ export function Game({ snap, room, onLeave, notify }) {
     return () => clearTimeout(t);
   }, [myTurn, g.turn, g.round]);
   useEffect(() => {
-    const base = 'Facet';
-    const update = () => { document.title = myTurn && document.hidden ? '● Your turn · Facet' : base; };
+    const base = 'Trilliant';
+    const update = () => { document.title = myTurn && document.hidden ? '● Your turn · Trilliant' : base; };
     update();
     document.addEventListener('visibilitychange', update);
     return () => { document.removeEventListener('visibilitychange', update); document.title = base; };
@@ -280,7 +280,7 @@ export function Game({ snap, room, onLeave, notify }) {
 
   return html`<div class="game">
     <header class="topbar">
-      <p class="topbar__mark">Facet</p>
+      <p class="topbar__mark">Trilliant</p>
       <div class="topbar__status" aria-live="polite">
         <span class=${cls('turnpill', myTurn && 'is-mine')}>
           ${over ? 'Game over' : myTurn ? 'Your turn' : `${current.name}’s turn`}

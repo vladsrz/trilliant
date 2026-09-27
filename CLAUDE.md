@@ -1,6 +1,6 @@
-# Facet — agent notes
+# Trilliant — agent notes
 
-Online Splendor-rules game. Static site, no build, no server. Read `README.md` for the architecture.
+Online Splendor-rules game. Static site, no build, no server. Read `README.md` for the architecture. Live at https://vladsrz.github.io/trilliant/ (GitHub Pages from `main`).
 
 ## Invariants — don't break these
 - `js/engine.js` stays pure (no DOM, no network, no `Date.now()` in rules). Every rule change gets a test in `test/engine.test.mjs`; the simulation test must keep passing.
@@ -12,7 +12,7 @@ Online Splendor-rules game. Static site, no build, no server. Read `README.md` f
 - Names and chat render as text only (Preact escapes). Never `innerHTML` user data; the only `innerHTML` is the static gem sprite.
 
 ## Design
-Vlad wants it restrained: plain dark table, flat ivory cards, no art/textures/gradients on cards or background. The cut gems (one shape per colour) are the only saturated colour and carry colour-blind legibility. Numerals use the UI face (IM Fell's old-style figures read "1" as "I"). Keep it that way unless he asks.
+Deliberately restrained: plain dark table, flat ivory cards, no art/textures/gradients on cards or background. The cut gems (one shape per colour) are the only saturated colour and carry colour-blind legibility. Numerals use the UI face (IM Fell's old-style figures read "1" as "I"). Keep it that way unless asked.
 
 ## Verify before calling a change done
 1. `npm test` and `npm run test:live`.
