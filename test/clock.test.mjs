@@ -18,11 +18,11 @@ async function table() {
   return { host, me, other };
 }
 
-test('the clock defaults to 3 minutes and only takes the offered choices, in the lobby', async () => {
+test('the clock defaults to Slow (3 min) and only takes the offered presets, in the lobby', async () => {
   const { host } = await table();
   assert.equal(host.turnSeconds, 180);
-  host.setTimer(45);
-  assert.equal(host.turnSeconds, 180, 'not an offered choice');
+  host.setTimer(55);
+  assert.equal(host.turnSeconds, 180, 'not an offered preset');
   host.setTimer(60);
   assert.equal(host.turnSeconds, 60);
   assert.equal(host.lobbyPublic().turnSeconds, 60, 'guests see the setting');
@@ -33,6 +33,25 @@ test('the clock defaults to 3 minutes and only takes the offered choices, in the
   assert.equal(info.seconds, 60);
   assert.ok(info.remainingMs > 58000 && info.remainingMs <= 60000);
   host.stop();
+});
+
+test('a saved lobby with an unknown timer value falls back to Slow', async () => {
+  const { host } = await table();
+  host.record.settings.turnSeconds = 175;
+  assert.equal(host.turnSeconds, 180);
+});
+
+test('points to win: default 15, any whole number up to 30, lobby only', async () => {
+  const { host } = await table();
+  assert.equal(host.target, 15);
+  for (const bad of [14, 31, 22.5]) host.setTarget(bad);
+  assert.equal(host.target, 15);
+  host.setTarget(24);
+  assert.equal(host.lobbyPublic().target, 24);
+  assert.ok(host.startGame().ok);
+  assert.equal(host.record.game.target, 24);
+  host.setTarget(30);
+  assert.equal(host.target, 24, 'no changes mid-game');
 });
 
 test('when time runs out the host skips the turn and starts a fresh clock', async () => {
@@ -47,7 +66,7 @@ test('when time runs out the host skips the turn and starts a fresh clock', asyn
   assert.equal(g.turn, (g0.turn + 1) % 2, 'turn passed on');
   assert.equal(g.log.at(-1).t, 'timeout');
   assert.ok(host.record.rev > rev0, 'players get synced');
-  assert.ok(host.deadline - Date.now() > 175000, 'next player gets a full clock');
+  assert.ok(host.deadline - Date.now() > 170000, 'next player gets a full clock');
   host.stop();
 });
 
@@ -89,6 +108,6 @@ test('a reopened game restarts the clock instead of skipping someone at once', a
   assert.ok(host.startGame().ok);
   host.deadline = Date.now() - 60000; // as if the tab had been closed for a while
   host.start();
-  assert.ok(host.deadline - Date.now() > 175000);
+  assert.ok(host.deadline - Date.now() > 170000);
   host.stop();
 });

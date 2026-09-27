@@ -325,7 +325,8 @@ test('a 30-point game only ends its last round at 30', () => {
   s = withPlayer(s, first, { cards: [...fives, ...CARDS.filter((c) => c.points === 4).slice(0, 2).map((c) => c.id)] }); // 25 + 8 = 33
   s = act(s, { type: 'take', gems: ['red', 'black', 'white'] });
   assert.equal(s.finalRound, true);
-  assert.throws(() => newGame(seats(2), { target: 20 }));
+  assert.equal(newGame(seats(2), { target: 22 }).target, 22, 'anything from 15 to 30 works');
+  for (const bad of [14, 31, 20.5, '20']) assert.throws(() => newGame(seats(2), { target: bad }));
 });
 
 // ---------- whole-game simulation ----------
@@ -378,7 +379,7 @@ test('thousands of random games keep every invariant', () => {
   for (let seed = 1; seed <= 1500; seed++) {
     const n = 2 + (seed % 3);
     const rand = seededRandom(seed * 7919);
-    let s = newGame(seats(n), { rand, target: seed % 5 === 0 ? 30 : 15 });
+    let s = newGame(seats(n), { rand, target: seed % 5 === 0 ? 15 + (seed % 16) : 15 });
     let steps = 0;
     const policy = seed % 2 ? greedyAction : randomAction;
     while (s.phase !== 'over' && steps < 3000) {

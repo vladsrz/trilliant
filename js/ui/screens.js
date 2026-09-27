@@ -5,11 +5,33 @@ import {
   MAX_TOKENS, MAX_RESERVED, WIN_POINTS,
 } from '../engine.js';
 import { Gem, Card, Deck, Noble, Well, Holdings, Reserved, SeatCard, LogItem, cls, ROMAN, describeCard } from './parts.js';
-import { NAME_MAX, CHAT_MAX, TIMER_CHOICES } from '../net/room.js';
-import { TARGET_CHOICES } from '../engine.js';
+import { NAME_MAX, CHAT_MAX } from '../net/room.js';
+import { MIN_TARGET, MAX_TARGET } from '../engine.js';
 import { every } from '../net/ticker.js';
 
-const TIMER_LABELS = { 0: 'Off', 60: '1 min', 120: '2 min', 180: '3 min' };
+const TIMER_OPTIONS = [
+  { sec: 180, name: 'Slow', time: '3 min' },
+  { sec: 120, name: 'Normal', time: '2 min' },
+  { sec: 60, name: 'Fast', time: '1 min' },
+  { sec: 0, name: 'Off' },
+];
+
+const PencilIcon = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>`;
+const CrossIcon = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>`;
+
+// Points-to-win slider: shows the value while dragging, tells the room only on release.
+function TargetSlider({ value, onCommit }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const fill = ((draft - MIN_TARGET) / (MAX_TARGET - MIN_TARGET)) * 100;
+  return html`<div class="slider">
+    <input type="range" min=${MIN_TARGET} max=${MAX_TARGET} step="1" value=${draft} aria-label="Points to win"
+      style=${`--fill:${fill}%`}
+      onInput=${(e) => setDraft(Number(e.currentTarget.value))}
+      onChange=${(e) => onCommit(Number(e.currentTarget.value))} />
+    <span class="slider__value">${draft}</span>
+  </div>`;
+}
 const clock = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 
 // Seconds left until `deadline`, ticking once a second. Runs on the worker
@@ -131,12 +153,12 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   useEffect(() => setDraft(name), [name]);
-  const link = location.href;
   const copy = async () => {
-    try { await navigator.clipboard.writeText(link); notify('Invite link copied.'); } catch { notify('Copy the link from the address bar.'); }
+    try { await navigator.clipboard.writeText(location.href); notify('Invite link copied. Send it to your friends.'); } catch { notify('Copy the link from the address bar.'); }
   };
   const canStart = lobby.seats.length >= 2;
   const open = lobby.max - lobby.seats.length;
+  const timer = TIMER_OPTIONS.find((o) => o.sec === lobby.turnSeconds) || TIMER_OPTIONS[0];
   const saveName = (e) => {
     e.preventDefault();
     if (draft.trim()) onRename(draft);
@@ -144,64 +166,61 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
   };
 
   return html`<main class="stage">
-    <section class="panel sheet">
-      <h1 class="sheet__title">${isHost ? 'Your game' : `${hostName}’s game`}</h1>
-      <p class="sheet__sub">${isHost ? 'Send this link to your friends. Keep this tab open while you play.' : 'You’re in.'}</p>
+    <section class="panel sheet lobby">
+      <header class="lobby__head">
+        <h1 class="sheet__title">${isHost ? 'Your game' : `${hostName}’s game`}</h1>
+        <button type="button" class=${cls('btn btn--small', !canStart && isHost && 'btn--primary')} onClick=${copy}>Copy invite link</button>
+      </header>
 
-      <div class="invite">
-        <span class="invite__link" title=${link}>${link}</span>
-        <button type="button" class="btn" onClick=${copy}>Copy invite link</button>
-      </div>
-
-      <ul class="seats">
+      <ul class="players" aria-label="Players">
         ${lobby.seats.map((s) => {
           const mine = s.id === snap.selfId;
           const wins = snap.tally?.[s.id] || 0;
           if (mine && editing) {
-            return html`<li class="seat"><form class="rename" onSubmit=${saveName}>
+            return html`<li class="player"><form class="rename" onSubmit=${saveName}>
               <input class="field" aria-label="Your name" value=${draft} maxlength=${NAME_MAX} autofocus onInput=${(e) => setDraft(e.currentTarget.value)} />
               <button class="btn btn--small btn--primary" type="submit" disabled=${!draft.trim()}>Save</button>
               <button class="btn btn--small btn--ghost" type="button" onClick=${() => { setDraft(name); setEditing(false); }}>Cancel</button>
             </form></li>`;
           }
-          return html`<li class="seat">
-            <span class=${cls('dot', s.online && 'is-on')} title=${s.online ? 'Online' : 'Offline'}></span>
-            <span class="seat__name">${s.name}${mine ? html` <span class="seat__you">(you)</span>` : null}</span>
-            ${wins ? html`<span class="seat__wins">${wins} win${wins === 1 ? '' : 's'}</span>` : null}
-            ${s.host ? html`<span class="seat__tag">Host</span>` : null}
-            ${mine ? html`<button type="button" class="btn btn--small btn--ghost" onClick=${() => setEditing(true)}>Change name</button>` : null}
-            ${isHost && !s.host ? html`<button type="button" class="btn btn--small btn--ghost" onClick=${() => room.removeSeat(s.id)}>Remove</button>` : null}
+          return html`<li class="player">
+            <span class="player__name">${s.name}${mine ? html` <span class="seat__you">(you)</span>` : null}</span>
+            ${mine ? html`<button type="button" class="icon-btn" title="Change name" aria-label="Change name" onClick=${() => setEditing(true)}>${PencilIcon}</button>` : null}
+            <span class="player__meta">
+              ${!s.online ? html`<span class="seat__off">offline</span>` : null}
+              ${wins ? html`<span>${wins} win${wins === 1 ? '' : 's'}</span>` : null}
+            </span>
+            ${isHost && !s.host ? html`<button type="button" class="icon-btn" title=${`Remove ${s.name}`} aria-label=${`Remove ${s.name}`} onClick=${() => room.removeSeat(s.id)}>${CrossIcon}</button>` : null}
           </li>`;
         })}
-        ${open > 0 ? html`<li class="seat seat--empty"><span class="dot"></span>
-          <span class="seat__name">${canStart ? `Room for ${open} more` : 'Waiting for someone to join…'}</span></li>` : null}
+        ${open > 0 ? html`<li class="player player--empty">${canStart ? `Room for ${open} more` : 'Waiting for players…'}</li>` : null}
       </ul>
 
-      <div class="setting">
-        <span class="setting__label">Points to win</span>
-        ${isHost
-          ? html`<div class="segmented" role="radiogroup" aria-label="Points to win">
-              ${TARGET_CHOICES.map((pts) => html`<button type="button" role="radio" aria-checked=${String(lobby.target === pts)}
-                class=${cls(lobby.target === pts && 'is-on')} onClick=${() => room.setTarget(pts)}>${pts}</button>`)}
-            </div>`
-          : html`<span class="setting__value">${lobby.target ?? 15}</span>`}
-      </div>
-      <div class="setting setting--tight">
-        <span class="setting__label">Turn timer</span>
-        ${isHost
-          ? html`<div class="segmented" role="radiogroup" aria-label="Turn timer">
-              ${TIMER_CHOICES.map((sec) => html`<button type="button" role="radio" aria-checked=${String(lobby.turnSeconds === sec)}
-                class=${cls(lobby.turnSeconds === sec && 'is-on')} onClick=${() => room.setTimer(sec)}>${TIMER_LABELS[sec]}</button>`)}
-            </div>`
-          : html`<span class="setting__value">${TIMER_LABELS[lobby.turnSeconds] ?? 'Off'}</span>`}
+      <div class="settings">
+        <div class="setting">
+          <span class="setting__label">Points to win</span>
+          ${isHost
+            ? html`<${TargetSlider} value=${lobby.target ?? MIN_TARGET} onCommit=${(n) => room.setTarget(n)} />`
+            : html`<span class="setting__value">${lobby.target ?? MIN_TARGET}</span>`}
+        </div>
+        <div class="setting">
+          <span class="setting__label">Turn timer${timer.time ? html`<span class="setting__hint">${timer.time} per turn</span>` : null}</span>
+          ${isHost
+            ? html`<div class="segmented" role="radiogroup" aria-label="Turn timer">
+                ${TIMER_OPTIONS.map((o) => html`<button type="button" role="radio" aria-checked=${String(timer.sec === o.sec)}
+                  class=${cls(timer.sec === o.sec && 'is-on')} onClick=${() => room.setTimer(o.sec)}>${o.name}</button>`)}
+              </div>`
+            : html`<span class="setting__value">${timer.name}</span>`}
+        </div>
       </div>
 
-      <div class="sheet__actions">
-        <button type="button" class="btn btn--danger" onClick=${onLeave}>Leave game</button>
+      <div class="lobby__actions">
+        <button type="button" class="btn btn--small btn--danger" onClick=${onLeave}>Leave</button>
         ${isHost
           ? html`<button type="button" class="btn btn--primary" disabled=${!canStart} onClick=${() => { const r = room.startGame(); if (!r.ok) notify(r.error); }}>Start game</button>`
           : html`<button type="button" class="btn" disabled>Waiting for ${hostName} to start</button>`}
       </div>
+      ${isHost ? html`<p class="lobby__note">Keep this tab open while you play. Your browser runs the game.</p>` : null}
     </section>
   </main>`;
 }
@@ -385,7 +404,6 @@ export function Game({ snap, room, onLeave, notify }) {
       <section class="panel seatcard me" aria-label="Your seat">
         <div class="me__main">
           <div class="seatcard__head">
-            <span class="dot is-on"></span>
             <span class="seatcard__name">${me.name} <span class="seat__you">(you)</span></span>
             <span class="seatcard__score"><b>${pointsOf(me)}</b><span>/ ${g.target || WIN_POINTS}</span></span>
           </div>

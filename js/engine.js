@@ -5,8 +5,10 @@
 import { CARDS, NOBLES, COLORS, GOLD, TOKEN_COLORS } from './data.js';
 
 export const WIN_POINTS = 15;
-// Points needed to trigger the last round. Geminist offers 15 (standard) and 30 (long game).
-export const TARGET_CHOICES = [15, 30];
+// Points needed to trigger the last round: anything from the standard 15 up to 30.
+export const MIN_TARGET = 15;
+export const MAX_TARGET = 30;
+export const isValidTarget = (n) => Number.isInteger(n) && n >= MIN_TARGET && n <= MAX_TARGET;
 export const MAX_TOKENS = 10;
 export const MAX_RESERVED = 3;
 export const MIN_PLAYERS = 2;
@@ -126,7 +128,7 @@ export function deckCounts(state) {
 // ---------- setup ----------
 
 export function newGame(seats, { rand = secureRandom, target = WIN_POINTS } = {}) {
-  if (!TARGET_CHOICES.includes(target)) throw new Error(`Target must be one of ${TARGET_CHOICES.join(', ')}`);
+  if (!isValidTarget(target)) throw new Error(`Target must be a whole number from ${MIN_TARGET} to ${MAX_TARGET}`);
   const n = seats.length;
   if (n < MIN_PLAYERS || n > MAX_PLAYERS) throw new Error(`Needs ${MIN_PLAYERS}-${MAX_PLAYERS} players`);
   const decks = { 1: [], 2: [], 3: [] };

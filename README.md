@@ -14,11 +14,11 @@ Fan-made. Not affiliated with Space Cowboys or Asmodee. No art or text from the 
 2. **Copy invite link** and send it. Whoever opens it gets a seat (2–4 players).
 3. The host presses **Start game**.
 
-The host's browser runs the game, so the host keeps that tab open. If it closes, the game pauses; the host reopens it from **Your games** on the start page (same browser) and everyone reconnects. Other players can close the tab and reopen the link any time without losing their seat. **Leave game** in the lobby gives your seat up.
+The host's browser runs the game, so the host keeps that tab open. If it closes, the game pauses; the host reopens it from the start page (same browser) and everyone reconnects. Other players can close the tab and reopen the link any time without losing their seat. **Leave** in the lobby gives your seat up.
 
-**Game settings** (host, in the lobby): **Points to win** 15 or 30 (a long game), and a **Turn timer** of Off, 1, 2 or 3 minutes (default 3), matching geminist's options.
+**Game settings** (host, in the lobby): **Points to win** anywhere from 15 (default) to 30 on a slider, and a **Turn timer** of Slow 3 min (default), Normal 2 min, Fast 1 min or Off, like geminist's speeds.
 
-**Turn timer:** The clock shows next to whose turn it is and goes red in the last 30 seconds. At zero that turn is skipped; if the player was mid put-back or choosing a noble, it's finished for them. The clock pauses while the host is away.
+**Turn timer:** the clock shows next to whose turn it is and goes red in the last 30 seconds. At zero that turn is skipped; if the player was mid put-back or choosing a noble, it's finished for them. The clock pauses while the host is away.
 
 After a game the host can **Play again**; the lobby and results keep a running win count.
 

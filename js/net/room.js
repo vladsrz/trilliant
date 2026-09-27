@@ -13,7 +13,7 @@
 
 import { Bus } from './bus.js';
 import { fingerprint, pairKey, sealText, openText, randomId } from './crypto.js';
-import { newGame, applyAction, applyTimeout, viewFor, MAX_PLAYERS, MIN_PLAYERS, TARGET_CHOICES, WIN_POINTS } from '../engine.js';
+import { newGame, applyAction, applyTimeout, viewFor, MAX_PLAYERS, MIN_PLAYERS, isValidTarget, WIN_POINTS } from '../engine.js';
 import { saveHostRecord } from './identity.js';
 import { every } from './ticker.js';
 
@@ -25,8 +25,8 @@ const CHAT_KEEP = 120;
 const CLIENTS_MAX = 24;
 const CHAT_SEND = 60;
 export const NAME_MAX = 20;
-// Turn timer choices in seconds (0 = off). Geminist runs about 3 minutes a turn.
-export const TIMER_CHOICES = [0, 60, 120, 180];
+// Turn timer presets in seconds: Slow 3 min, Normal 2 min, Fast 1 min, or Off (0).
+export const TIMER_CHOICES = [180, 120, 60, 0];
 const DEFAULT_TURN_SECONDS = 180;
 const GRACE_MS = 30000;
 export const CHAT_MAX = 240;
@@ -159,12 +159,12 @@ export class HostRoom extends Emitter {
 
   get target() {
     const t = this.record.settings?.target;
-    return TARGET_CHOICES.includes(t) ? t : WIN_POINTS;
+    return isValidTarget(t) ? t : WIN_POINTS;
   }
 
   setTarget(points) {
     const r = this.record;
-    if (r.status === 'playing' || !TARGET_CHOICES.includes(points) || points === this.target) return;
+    if (r.status === 'playing' || !isValidTarget(points) || points === this.target) return;
     r.settings = { ...(r.settings || {}), target: points };
     this.bump();
   }
