@@ -59,7 +59,7 @@ test('setup scales with player count', () => {
 test('taking gems follows the three-different / two-same rule', () => {
   let s = game();
   reject(s, { type: 'take', gems: ['white', 'blue'] }, /3 different/);
-  reject(s, { type: 'take', gems: ['white', 'white', 'blue'] }, /different colours/);
+  reject(s, { type: 'take', gems: ['white', 'white', 'blue'] }, /different colors/);
   reject(s, { type: 'take', gems: ['gold'] }, /Gold/);
   reject(s, { type: 'take', gems: ['white', 'blue', 'green', 'red'] });
   reject(s, { type: 'take', gems: ['white', 'blue', 'green'] }, /turn/, s.players[(s.turn + 1) % 2].id);
@@ -71,7 +71,7 @@ test('taking gems follows the three-different / two-same rule', () => {
   assert.equal(s.bank.white, 1);
 });
 
-test('fewer than three is allowed only when fewer colours remain', () => {
+test('fewer than three is allowed only when fewer colors remain', () => {
   let s = game();
   s.bank = { white: 0, blue: 0, green: 0, red: 2, black: 1, gold: 5 };
   reject(s, { type: 'take', gems: ['red'] }, /2 different/);

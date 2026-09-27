@@ -450,7 +450,7 @@ export class GuestRoom extends Emitter {
       return;
     }
     const box = await sealText(this.key, { name: this.name, want: this.want, rev: this.rev });
-    this.bus.send('hi', { pub: this.identity.pub, box }).catch(() => {});
+    await this.bus.send('hi', { pub: this.identity.pub, box }).catch(() => {});
   }
 
   // Only the host whose id is pinned in the invite link is believed.
@@ -526,14 +526,10 @@ export class GuestRoom extends Emitter {
     this.hi();
   }
 
-  leaveSeat() {
+  // Give the seat back (lobby only; mid-game the host keeps it for a rejoin).
+  async leaveSeat() {
     this.want = 'leave';
-    this.hi();
-  }
-
-  takeSeat() {
-    this.want = 'seat';
-    this.hi();
+    await this.hi();
   }
 
   snapshot() {

@@ -3,7 +3,7 @@
 
 import { html } from '../../vendor/preact-htm.js';
 import { CARDS, NOBLES, COLORS, TOKEN_COLORS } from '../data.js';
-import { COLOR_NAMES, bonusesOf, pointsOf, tokenTotal, MAX_TOKENS, MAX_RESERVED, WIN_POINTS } from '../engine.js';
+import { COLOR_NAMES, bonusesOf, pointsOf, tokenTotal, MAX_TOKENS, WIN_POINTS } from '../engine.js';
 
 export const cls = (...xs) => xs.filter(Boolean).join(' ');
 export const ROMAN = { 1: 'I', 2: 'II', 3: 'III' };
@@ -13,8 +13,8 @@ export function Gem({ color, cls: extra = '', title }) {
   return html`<svg class=${cls('gem', extra)} viewBox="0 0 64 64" role=${title ? 'img' : undefined} aria-label=${title} aria-hidden=${title ? undefined : 'true'}><use href=${`#gem-${color}`} /></svg>`;
 }
 
-export function Chip({ color, n }) {
-  return html`<span class=${cls('chip', `chip--${color}`, !n && 'is-zero')}>${n}</span>`;
+export function Chip({ color, n, hideZero = false }) {
+  return html`<span class=${cls('chip', `chip--${color}`, !n && 'is-zero')}>${hideZero && !n ? '' : n}</span>`;
 }
 
 export function cardLabel(card) {
@@ -100,7 +100,7 @@ export function Holdings({ player, onGem, marked }) {
       const left = n - (marked?.[c] || 0);
       const clickable = onGem && n > 0;
       return html`<div class=${cls('hold', !n && 'is-zero')}>
-        ${c === 'gold' ? html`<span class="chip" style="visibility:hidden">0</span>` : html`<${Chip} color=${c} n=${b[c]} />`}
+        ${c === 'gold' ? html`<span class="chip" style="visibility:hidden">0</span>` : html`<${Chip} color=${c} n=${b[c]} hideZero />`}
         <span
           class=${cls('hold__gem', clickable && 'is-clickable', marked?.[c] && 'is-picked')}
           role=${clickable ? 'button' : undefined}
@@ -108,7 +108,7 @@ export function Holdings({ player, onGem, marked }) {
           aria-label=${`${n} ${COLOR_NAMES[c]}${marked?.[c] ? `, ${marked[c]} marked to return` : ''}`}
           onClick=${clickable ? () => onGem(c) : undefined}
           onKeyDown=${clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onGem(c); } } : undefined}>
-          <${Gem} color=${c} /><b>${marked ? left : n}</b>
+          <${Gem} color=${c} />${(marked ? left : n) ? html`<b>${marked ? left : n}</b>` : null}
         </span>
       </div>`;
     })}
@@ -117,9 +117,7 @@ export function Holdings({ player, onGem, marked }) {
 
 export function Reserved({ player, isYou, onPick, selectedId, canAfford, size }) {
   const slots = [];
-  for (let i = 0; i < MAX_RESERVED; i++) {
-    const r = player.reserved[i];
-    if (!r) { slots.push(html`<div class="slot" style=${size ? `--cw:${size}px` : undefined} aria-hidden="true"></div>`); continue; }
+  for (const r of player.reserved) {
     if (r.id === null) {
       slots.push(html`<${Deck} level=${r.level} hiddenCard />`);
       continue;
@@ -135,21 +133,19 @@ export function Reserved({ player, isYou, onPick, selectedId, canAfford, size })
   return html`<div class="reserved">${slots}</div>`;
 }
 
-export function SeatCard({ player, index, view, online, isTurn, flash, wins }) {
+export function SeatCard({ player, view, online, isTurn, flash }) {
   const pts = pointsOf(player);
   const held = tokenTotal(player.tokens);
   return html`<section class=${cls('panel', 'seatcard', 'opp', isTurn && 'is-turn', flash && 'is-flash')} aria-label=${`${player.name}, ${plural(pts, 'point')}`}>
     <div class="seatcard__head">
       <span class=${cls('dot', online && 'is-on')} title=${online ? 'Online' : 'Offline'}></span>
       <span class="seatcard__name">${player.name}</span>
-      ${isTurn ? html`<span class="seatcard__turn">${view.phase === 'over' ? '' : 'Playing'}</span>` : null}
+      ${isTurn ? html`<span class="seatcard__turn">Their turn</span>` : null}
       <span class="seatcard__score"><b>${pts}</b><span>/ ${WIN_POINTS}</span></span>
     </div>
     <${Holdings} player=${player} />
     <div class="holdings__foot">
       <span class=${held >= MAX_TOKENS ? 'is-full' : ''}>Gems <b>${held}</b>/${MAX_TOKENS}</span>
-      <span>Cards <b>${player.cards.length}</b></span>
-      ${wins ? html`<span>Wins <b>${wins}</b></span>` : null}
       ${player.nobles.length ? html`<span>Nobles <b>${player.nobles.length}</b></span>` : null}
     </div>
     ${player.reserved.length ? html`<${Reserved} player=${player} size=${46} />` : null}

@@ -31,29 +31,29 @@ export function Home({ name, onName, onCreate, tables, onResume, onForget, busy 
         ${['white', 'blue', 'green', 'red', 'black', 'gold'].map((c) => html`<${Gem} color=${c} />`)}
       </div>
       <h1 class="home__mark">Trilliant</h1>
-      <p class="home__lede">Trade gems, buy cards, win nobles. First to ${WIN_POINTS} points wins. Open a table and send the link to a friend.</p>
+      <p class="home__lede">Trade gems, buy cards, win nobles. First to ${WIN_POINTS} points wins. Create a game and send the link to a friend.</p>
       <form class="panel home__form" onSubmit=${submit}>
         <div>
           <label class="label" for="name">Your name</label>
           <div class="home__row">
             <input id="name" class="field" value=${name} maxlength=${NAME_MAX} autocomplete="nickname"
               onInput=${(e) => onName(e.currentTarget.value)} />
-            <button class="btn btn--primary" type="submit" disabled=${busy}>${busy ? 'Opening…' : 'Open a table'}</button>
+            <button class="btn btn--primary" type="submit" disabled=${busy}>${busy ? 'Creating…' : 'Create game'}</button>
           </div>
         </div>
         ${tables.length ? html`<div class="tables">
-          <h2 class="tables__title">Your tables</h2>
+          <h2 class="tables__title">Your games</h2>
           ${tables.map((t) => html`<div class="tables__row">
             <div class="tables__what">
-              <strong>${t.title || (t.role === 'host' ? 'Your table' : 'A friend’s table')}</strong>
-              <span>${t.role === 'host' ? 'You host' : 'Guest'} · ${ago(t.at)}</span>
+              <strong>${t.title || (t.role === 'host' ? 'Your game' : 'A friend’s game')}</strong>
+              <span>${t.role === 'host' ? 'You’re the host' : 'You joined'} · ${ago(t.at)}</span>
             </div>
-            <button type="button" class="btn btn--small" onClick=${() => onResume(t)}>Open</button>
+            <button type="button" class="btn btn--small" onClick=${() => onResume(t)}>Rejoin</button>
             <button type="button" class="btn btn--small btn--ghost" aria-label="Remove from list" onClick=${() => onForget(t)}>✕</button>
           </div>`)}
         </div>` : null}
       </form>
-      <p class="home__small">Plays by the rules of Splendor. Fan-made and free, not affiliated with Space Cowboys or Asmodee.<br />No sign-up: the table runs in the host’s browser and moves travel encrypted.</p>
+      <p class="home__small">Free, no sign-up. Plays by the rules of Splendor; fan-made, not affiliated with Space Cowboys or Asmodee.</p>
     </div>
   </main>`;
 }
@@ -71,19 +71,18 @@ export function Notice({ title, children, actions }) {
 }
 
 export function Connecting({ snap, waited }) {
-  const relays = snap?.link;
-  let line = 'Connecting to the relays…';
-  if (relays?.up) line = snap.role === 'guest' && !snap.hostOnline ? 'Looking for the host…' : 'Joining the table…';
+  const online = !!snap?.link?.up;
+  const guest = snap?.role === 'guest';
+  let line = 'Connecting…';
+  if (online) line = guest && !snap.hostOnline ? 'Waiting for the host…' : 'Almost there…';
+  let help = null;
+  if (waited && !online) help = 'Can’t connect. Check your internet. Some school or work Wi-Fi blocks games like this, so try phone data.';
+  else if (waited && guest && !snap.hostOnline) help = 'The host needs to have the game open. You’ll join as soon as they do.';
   return html`<main class="stage"><section class="panel sheet notice" aria-live="polite">
-    <div class="spinner"><${Gem} color="green" /></div>
-    <h1 class="sheet__title">${snap?.role === 'guest' ? 'Joining the table' : 'Opening the table'}</h1>
+    <div class="spinner"><${Gem} color="red" /></div>
+    <h1 class="sheet__title">${guest ? 'Joining game' : 'Creating game'}</h1>
     <p class="sheet__sub">${line}</p>
-    ${waited && snap?.role === 'guest' && !snap.hostOnline
-      ? html`<p class="sheet__sub">The host’s browser runs this table, so their tab needs to be open. It will connect by itself when they’re back.</p>`
-      : null}
-    ${waited && relays && !relays.up
-      ? html`<p class="sheet__sub">Can’t reach any relay. Check your connection, or try another network.</p>`
-      : null}
+    ${help ? html`<p class="sheet__sub">${help}</p>` : null}
   </section></main>`;
 }
 
@@ -94,24 +93,26 @@ export function Connecting({ snap, waited }) {
 export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
   const lobby = snap.lobby;
   const isHost = snap.role === 'host';
-  const hostSeat = lobby.seats.find((s) => s.host);
+  const hostName = lobby.seats.find((s) => s.host)?.name || 'the host';
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   useEffect(() => setDraft(name), [name]);
   const link = location.href;
   const copy = async () => {
     try { await navigator.clipboard.writeText(link); notify('Invite link copied.'); } catch { notify('Copy the link from the address bar.'); }
   };
-  const seats = [...lobby.seats];
-  while (seats.length < lobby.max) seats.push(null);
   const canStart = lobby.seats.length >= 2;
-  const saveName = (e) => { e.preventDefault(); onRename(draft); };
+  const open = lobby.max - lobby.seats.length;
+  const saveName = (e) => {
+    e.preventDefault();
+    if (draft.trim()) onRename(draft);
+    setEditing(false);
+  };
 
   return html`<main class="stage">
     <section class="panel sheet">
-      <h1 class="sheet__title">${isHost ? 'Your table' : `${hostSeat?.name || 'Host'}’s table`}</h1>
-      <p class="sheet__sub">${isHost
-        ? 'Send this link to the people you’re playing with. Keep this tab open while you play: your browser runs the table.'
-        : snap.seated ? `You’re in. ${hostSeat?.name || 'The host'} starts the game when everyone’s here.` : 'You left your seat.'}</p>
+      <h1 class="sheet__title">${isHost ? 'Your game' : `${hostName}’s game`}</h1>
+      <p class="sheet__sub">${isHost ? 'Send this link to your friends. Keep this tab open while you play.' : 'You’re in.'}</p>
 
       <div class="invite">
         <span class="invite__link" title=${link}>${link}</span>
@@ -119,27 +120,34 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
       </div>
 
       <ul class="seats">
-        ${seats.map((s) => s ? html`<li class="seat">
+        ${lobby.seats.map((s) => {
+          const mine = s.id === snap.selfId;
+          const wins = snap.tally?.[s.id] || 0;
+          if (mine && editing) {
+            return html`<li class="seat"><form class="rename" onSubmit=${saveName}>
+              <input class="field" aria-label="Your name" value=${draft} maxlength=${NAME_MAX} autofocus onInput=${(e) => setDraft(e.currentTarget.value)} />
+              <button class="btn btn--small btn--primary" type="submit" disabled=${!draft.trim()}>Save</button>
+              <button class="btn btn--small btn--ghost" type="button" onClick=${() => { setDraft(name); setEditing(false); }}>Cancel</button>
+            </form></li>`;
+          }
+          return html`<li class="seat">
             <span class=${cls('dot', s.online && 'is-on')} title=${s.online ? 'Online' : 'Offline'}></span>
-            <span class="seat__name">${s.name}${s.id === snap.selfId ? ' (you)' : ''}</span>
-            ${snap.tally?.[s.id] ? html`<span class="seat__wins" title="Wins at this table">${snap.tally[s.id]}</span>` : null}
+            <span class="seat__name">${s.name}${mine ? html` <span class="seat__you">(you)</span>` : null}</span>
+            ${wins ? html`<span class="seat__wins">${wins} win${wins === 1 ? '' : 's'}</span>` : null}
             ${s.host ? html`<span class="seat__tag">Host</span>` : null}
+            ${mine ? html`<button type="button" class="btn btn--small btn--ghost" onClick=${() => setEditing(true)}>Change name</button>` : null}
             ${isHost && !s.host ? html`<button type="button" class="btn btn--small btn--ghost" onClick=${() => room.removeSeat(s.id)}>Remove</button>` : null}
-          </li>`
-          : html`<li class="seat seat--empty"><span class="dot"></span><span class="seat__name">Open seat</span></li>`)}
+          </li>`;
+        })}
+        ${open > 0 ? html`<li class="seat seat--empty"><span class="dot"></span>
+          <span class="seat__name">${canStart ? `Room for ${open} more` : 'Waiting for someone to join…'}</span></li>` : null}
       </ul>
 
-      ${snap.seated ? html`<form class="rename" onSubmit=${saveName}>
-        <input class="field" aria-label="Your name" value=${draft} maxlength=${NAME_MAX} onInput=${(e) => setDraft(e.currentTarget.value)} />
-        <button class="btn btn--small" type="submit" disabled=${!draft.trim() || draft.trim() === name}>Rename</button>
-      </form>` : null}
-
       <div class="sheet__actions">
-        <button type="button" class="btn btn--ghost" onClick=${onLeave}>Leave table</button>
-        ${!isHost && snap.seated ? html`<button type="button" class="btn" onClick=${() => room.leaveSeat()}>Stand up</button>` : null}
-        ${!isHost && !snap.seated ? html`<button type="button" class="btn btn--primary" onClick=${() => room.takeSeat()}>Take a seat</button>` : null}
-        ${isHost ? html`<button type="button" class="btn btn--primary" disabled=${!canStart} onClick=${() => { const r = room.startGame(); if (!r.ok) notify(r.error); }}>
-          ${canStart ? 'Start game' : 'Waiting for a player…'}</button>` : null}
+        <button type="button" class="btn btn--danger" onClick=${onLeave}>Leave game</button>
+        ${isHost
+          ? html`<button type="button" class="btn btn--primary" disabled=${!canStart} onClick=${() => { const r = room.startGame(); if (!r.ok) notify(r.error); }}>Start game</button>`
+          : html`<button type="button" class="btn" disabled>Waiting for ${hostName} to start</button>`}
       </div>
     </section>
   </main>`;
@@ -244,7 +252,7 @@ export function Game({ snap, room, onLeave, notify }) {
     }
     if (!g.bank[c]) return;
     if (picks.length === 2 && picks[0] === picks[1]) return setPicks([c]);
-    if (picks.length >= 3) return setErr('That’s three already. Take them, or tap one to put it back.');
+    if (picks.length >= 3) return setErr('You can take 3 at most. Tap one to put it back.');
     setPicks([...picks, c]);
   };
   const isPair = picks.length === 2 && picks[0] === picks[1];
@@ -285,17 +293,15 @@ export function Game({ snap, room, onLeave, notify }) {
         <span class=${cls('turnpill', myTurn && 'is-mine')}>
           ${over ? 'Game over' : myTurn ? 'Your turn' : `${current.name}’s turn`}
           ${g.finalRound && !over ? html`<span class="turnpill__final">Last round</span>` : null}
-          ${!over ? html`<span class="turnpill__round">Round ${g.round}</span>` : null}
         </span>
       </div>
       <div class="topbar__tools">
-        <${NetState} snap=${snap} />
-        <button type="button" class="btn btn--small btn--ghost" onClick=${onLeave}>Leave</button>
+        <button type="button" class="btn btn--small btn--danger" onClick=${onLeave}>Leave game</button>
       </div>
     </header>
 
     <div class="main">
-      <section class="board" aria-label="Table">
+      <section class="board" aria-label="Board"><div class="board__in">
         <div class="nobles" aria-label="Nobles">
           ${g.nobles.map((id) => html`<${Noble} id=${id} />`)}
         </div>
@@ -321,7 +327,7 @@ export function Game({ snap, room, onLeave, notify }) {
             picked=${picks.filter((x) => x === c).length}
             flash=${fx.bank.has(c)} />`)}
         </div>
-      </section>
+      </div></section>
 
       <${Tray} ...${{ g, me, you, myTurn, over, current, picks, isPair, takeReady, rules, sel, busy, err, fresh, mustReturn, marked, markedTotal, isHost, snap }}
         onTake=${() => send({ type: 'take', gems: picks })}
@@ -337,31 +343,29 @@ export function Game({ snap, room, onLeave, notify }) {
         <div class="me__main">
           <div class="seatcard__head">
             <span class="dot is-on"></span>
-            <span class="seatcard__name">${me.name} <span style="color:var(--text-faint);font-weight:500">(you)</span></span>
+            <span class="seatcard__name">${me.name} <span class="seat__you">(you)</span></span>
             <span class="seatcard__score"><b>${pointsOf(me)}</b><span>/ ${WIN_POINTS}</span></span>
           </div>
           <${Holdings} player=${me} onGem=${mustReturn ? clickOwnGem : undefined} marked=${mustReturn ? marked : undefined} />
           <div class="holdings__foot">
             <span class=${tokenTotal(me.tokens) >= MAX_TOKENS ? 'is-full' : ''}>Gems <b>${tokenTotal(me.tokens)}</b>/${MAX_TOKENS}</span>
-            <span>Cards <b>${me.cards.length}</b></span>
-            <span>Nobles <b>${me.nobles.length}</b></span>
-            ${snap.tally?.[me.id] ? html`<span>Wins <b>${snap.tally[me.id]}</b></span>` : null}
+            ${me.nobles.length ? html`<span>Nobles <b>${me.nobles.length}</b></span>` : null}
           </div>
         </div>
-        <div class="me__reserve">
+        ${me.reserved.length ? html`<div class="me__reserve">
           <span class="reserved__label">Reserved ${me.reserved.length}/${MAX_RESERVED}</span>
           <${Reserved} player=${me} isYou
             onPick=${playing ? (id) => clickCard(id, 'reserve') : undefined}
             selectedId=${sel?.kind === 'card' ? sel.id : null}
             canAfford=${myTurn && g.phase === 'play' ? affordable : undefined} />
-        </div>
+        </div>` : null}
       </section>
     </div>
 
     <aside class="side">
       <div class="opps">
-        ${opponents.map((i) => html`<${SeatCard} player=${g.players[i]} index=${i} view=${g}
-          online=${onlineOf(g.players[i].id)} isTurn=${g.turn === i && !over} flash=${fx.seats.has(i)} wins=${snap.tally?.[g.players[i].id]} />`)}
+        ${opponents.map((i) => html`<${SeatCard} player=${g.players[i]} view=${g}
+          online=${onlineOf(g.players[i].id)} isTurn=${g.turn === i && !over} flash=${fx.seats.has(i)} />`)}
       </div>
       <${Feed} g=${g} chat=${snap.chat} you=${you} selfId=${snap.selfId}
         onSend=${(text) => room.act({ type: 'chat', text }).then((r) => { if (!r.ok) notify(r.error); return r; })} />
@@ -369,21 +373,14 @@ export function Game({ snap, room, onLeave, notify }) {
 
     ${myTurn && g.phase === 'noble' ? html`<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="noble-title">
       <section class="panel sheet notice">
-        <h2 class="sheet__title" id="noble-title">Two nobles want to visit</h2>
-        <p class="sheet__sub">Only one can come this turn. Pick who.</p>
+        <h2 class="sheet__title" id="noble-title">Choose a noble</h2>
+        <p class="sheet__sub">You qualify for more than one. Pick one (+3 points).</p>
         <div class="choices">${g.pending.options.map((id) => html`<${Noble} id=${id} onClick=${busy ? undefined : () => send({ type: 'noble', noble: id })} />`)}</div>
       </section>
     </div>` : null}
 
     ${over && showResult ? html`<${Results} g=${g} snap=${snap} room=${room} isHost=${isHost} onClose=${() => setShowResult(false)} />` : null}
   </div>`;
-}
-
-function NetState({ snap }) {
-  const up = snap.link?.up || 0;
-  const ok = up > 0 && (snap.role === 'host' || snap.hostOnline);
-  const text = !up ? 'Reconnecting…' : snap.role === 'guest' && !snap.hostOnline ? 'Host offline' : 'Connected';
-  return html`<span class="netstate" title=${`${up} of ${snap.link?.total || 3} relays connected`}><span class=${cls('dot', ok && 'is-on')}></span><span>${text}</span></span>`;
 }
 
 function PayLine({ pay }) {
@@ -413,17 +410,17 @@ function Tray(p) {
     const last = [...g.log].reverse().find((e) => ['take', 'reserve', 'buy', 'pass'].includes(e.t));
     hint = last ? html`<${LogItem} e=${last} players=${g.players} you=${you} tag="span" />` : 'Waiting for their move.';
   } else if (g.phase === 'discard') {
-    title = `Put back ${mustReturn} gem${mustReturn === 1 ? '' : 's'}`;
-    hint = `You can hold ${MAX_TOKENS}. Tap your gems below to choose which go back.`;
+    title = 'Too many gems';
+    hint = `You can hold ${MAX_TOKENS}. Tap ${mustReturn} of your gems below to put back.`;
     const picked = [];
     for (const c of TOKEN_COLORS) for (let i = 0; i < (marked[c] || 0); i++) picked.push(c);
     extra = picked.length ? html`<div class="tray__picks">${picked.map((c) => html`<${Gem} color=${c} title=${COLOR_NAMES[c]} />`)}</div>` : null;
     buttons = html`
       <button type="button" class="btn btn--primary" disabled=${busy || markedTotal !== mustReturn} onClick=${p.onReturn}>Put back ${markedTotal}/${mustReturn}</button>
-      ${markedTotal ? html`<button type="button" class="btn" onClick=${p.onClear}>Clear</button>` : null}`;
+      ${markedTotal ? html`<button type="button" class="btn btn--ghost" onClick=${p.onClear}>Cancel</button>` : null}`;
   } else if (g.phase === 'noble') {
     title = 'Choose a noble';
-    hint = 'Two nobles qualify. Pick one.';
+    hint = 'Pick one of the nobles that qualify.';
   } else if (sel?.kind === 'card') {
     const card = CARDS[sel.id];
     const pay = autoPayment(me, card);
@@ -438,7 +435,7 @@ function Tray(p) {
     if (sel.from === 'board' && !canReserve) hint = `You already hold ${MAX_RESERVED} reserved cards.`;
   } else if (sel?.kind === 'deck') {
     title = `Level ${ROMAN[sel.level]} deck`;
-    hint = 'Reserve the top card without showing it to anyone.';
+    hint = 'Reserve the top card without showing it.';
     buttons = html`
       <button type="button" class="btn btn--primary" disabled=${busy} onClick=${() => p.onReserveDeck(sel.level)}>Reserve top card${g.bank.gold ? ' + 1 gold' : ''}</button>
       <button type="button" class="btn btn--ghost" onClick=${p.onClear}>Cancel</button>`;
@@ -446,17 +443,17 @@ function Tray(p) {
     title = 'Take gems';
     extra = html`<div class="tray__picks">${picks.map((c) => html`<${Gem} color=${c} title=${COLOR_NAMES[c]} />`)}</div>`;
     if (isPair) hint = `Two ${COLOR_NAMES[picks[0]]}s.`;
-    else if (takeReady) hint = picks.length === 1 && rules.pairable.includes(picks[0]) ? `Or tap it again to take two.` : 'Ready.';
+    else if (takeReady) hint = 'Ready.';
     else {
       const left = rules.distinctNeeded - picks.length;
-      hint = `Pick ${left} more colour${left === 1 ? '' : 's'}${picks.length === 1 && rules.pairable.includes(picks[0]) ? `, or tap ${COLOR_NAMES[picks[0]]} again to take two` : ''}.`;
+      hint = `Pick ${left} more color${left === 1 ? '' : 's'}${picks.length === 1 && rules.pairable.includes(picks[0]) ? `, or tap ${COLOR_NAMES[picks[0]]} again for two` : ''}.`;
     }
     buttons = html`
       <button type="button" class="btn btn--primary" disabled=${busy || !takeReady} onClick=${p.onTake}>Take gems</button>
-      <button type="button" class="btn btn--ghost" onClick=${p.onClear}>Clear</button>`;
+      <button type="button" class="btn btn--ghost" onClick=${p.onClear}>Cancel</button>`;
   } else {
     title = 'Your turn';
-    hint = 'Tap gems in the bank to take 3 different or 2 of one colour, or tap a card to buy or reserve it.';
+    hint = 'Take gems from the bank, or tap a card to buy or reserve it.';
     if (!hasMainAction(g, you)) {
       hint = 'You have no legal move this turn.';
       buttons = html`<button type="button" class="btn btn--primary" disabled=${busy} onClick=${p.onPass}>Pass</button>`;
@@ -528,7 +525,7 @@ function Results({ g, snap, room, isHost, onClose }) {
   return html`<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="result-title">
     <section class="panel sheet">
       <h2 class="sheet__title" id="result-title">${headline}</h2>
-      <p class="sheet__sub">${g.players.length === 2 ? 'Final score' : 'Final standings'} after ${g.round} round${g.round === 1 ? '' : 's'}.${ranking[1] && ranking[0].points === ranking[1].points ? ' Tied on points, so fewer cards bought wins.' : ''}</p>
+      ${ranking[1] && ranking[0].points === ranking[1].points ? html`<p class="sheet__sub">Tied on points, so whoever bought fewer cards wins.</p>` : null}
       <ol class="results">
         ${ranking.map((r, i) => {
           const key = `${r.points}-${r.cards}`;
@@ -542,13 +539,13 @@ function Results({ g, snap, room, isHost, onClose }) {
           </li>`;
         })}
       </ol>
-      ${Object.keys(snap.tally || {}).length ? html`<p class="tally">Wins at this table: ${g.players.map((pl, i) => html`${i ? ' · ' : ''}<b>${pl.name}</b> ${snap.tally[pl.id] || 0}`)}</p>` : null}
+      ${Object.keys(snap.tally || {}).length ? html`<p class="tally">Wins so far: ${g.players.map((pl, i) => html`${i ? ' · ' : ''}<b>${pl.name}</b> ${snap.tally[pl.id] || 0}`)}</p>` : null}
       <div class="sheet__actions">
-        <button type="button" class="btn btn--ghost" onClick=${onClose}>See the board</button>
+        <button type="button" class="btn btn--ghost" onClick=${onClose}>Close</button>
         ${isHost
           ? html`<button type="button" class="btn" onClick=${() => room.backToLobby()}>Back to lobby</button>
-                 <button type="button" class="btn btn--primary" onClick=${() => room.startGame()}>Rematch</button>`
-          : html`<span class="tray__hint">${hostName} can start a rematch.</span>`}
+                 <button type="button" class="btn btn--primary" onClick=${() => room.startGame()}>Play again</button>`
+          : html`<button type="button" class="btn" disabled>Waiting for ${hostName} to play again</button>`}
       </div>
     </section>
   </div>`;

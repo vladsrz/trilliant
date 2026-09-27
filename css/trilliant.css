@@ -74,6 +74,11 @@ button { cursor: pointer; }
 .btn--small { min-height: 30px; padding: 0 12px; font-size: 13px; }
 .btn--ghost { border-color: transparent; background: transparent; color: var(--text-mute); }
 .btn--ghost:hover:not(:disabled) { color: var(--text); border-color: var(--line); background: transparent; }
+/* Leaving: red so it can't be mistaken for anything else. */
+.btn--danger { color: #f19a8f; border-color: rgba(233, 115, 99, 0.5); background: transparent; }
+.btn--danger:hover:not(:disabled) { color: #ffb4aa; border-color: #e97363; background: rgba(233, 115, 99, 0.1); }
+.btn--danger-solid { color: #fff4f1; border-color: transparent; background: #c2443a; }
+.btn--danger-solid:hover:not(:disabled) { background: #d4544a; border-color: transparent; }
 
 .field {
   width: 100%; min-height: 44px; padding: 0 14px;
@@ -118,7 +123,7 @@ button { cursor: pointer; }
 .home__row .field { flex: 1; }
 .home__small { margin-top: 26px; font-size: 12.5px; color: var(--text-faint); }
 .tables { margin-top: 22px; text-align: left; }
-.tables__title { font: 400 20px var(--font-display); margin: 0 0 8px; color: var(--ivory); }
+.tables__title { font: 700 17px var(--font-ui); margin: 0 0 8px; color: var(--ivory); }
 .tables__row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line); }
 .tables__row:first-of-type { border-top: 0; }
 .tables__what { flex: 1; min-width: 0; }
@@ -129,7 +134,7 @@ button { cursor: pointer; }
 
 .stage { min-height: 100dvh; display: grid; place-items: center; padding: 28px 16px; }
 .sheet { width: min(560px, 100%); padding: 26px; }
-.sheet__title { font: 400 34px/1.05 var(--font-display); margin: 0 0 6px; color: var(--ivory); }
+.sheet__title { font: 700 28px/1.15 var(--font-ui); letter-spacing: -0.015em; margin: 0 0 8px; color: var(--ivory); }
 .sheet__sub { margin: 0 0 20px; color: var(--text-mute); }
 .sheet__actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 20px; }
 .notice { text-align: center; }
@@ -151,15 +156,17 @@ button { cursor: pointer; }
 .seat--empty { border-style: dashed; color: var(--text-faint); }
 .seat__name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seat__tag { font-size: 12px; color: var(--text-mute); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.seat__you { color: var(--text-faint); font-weight: 500; }
+.seat .rename { display: flex; gap: 8px; width: 100%; margin: 0; }
+.seat .rename .field { min-height: 34px; }
 .seat__wins { font: 800 15px var(--font-ui); color: var(--brass-hi); }
-.rename { display: flex; gap: 8px; margin-top: 16px; }
-.rename .field { flex: 1; min-height: 38px; font-size: 15px; }
+.rename .field { flex: 1; font-size: 15px; }
 
 /* ---------- game layout ---------- */
 
 .game {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(270px, 22vw, 330px);
+  grid-template-columns: minmax(0, 1fr) clamp(250px, 22vw, 330px);
   grid-template-rows: auto minmax(0, 1fr);
   gap: 12px 14px;
   height: 100dvh;
@@ -174,10 +181,8 @@ button { cursor: pointer; }
   background: rgba(0, 0, 0, 0.25); border: 1px solid var(--line); font-weight: 600; font-size: 14px;
 }
 .turnpill.is-mine { color: #241809; border-color: transparent; background: #d4b06a; }
-.turnpill__round { font-weight: 500; opacity: 0.75; }
 .turnpill__final { color: var(--warn); }
 .turnpill.is-mine .turnpill__final { color: #7a2a12; }
-.netstate { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-mute); }
 
 .main { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
 .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
@@ -186,13 +191,13 @@ button { cursor: pointer; }
 
 .board {
   flex: 1; min-height: 0;
-  display: grid; grid-template-columns: auto auto auto; justify-content: center; align-content: center;
-  gap: clamp(10px, 1.6vw, 22px);
+  display: grid; place-items: center;
   padding: 14px clamp(10px, 1.6vw, 22px);
   border-radius: 18px;
   background: #221b17;
   border: 1px solid var(--line);
 }
+.board__in { display: grid; grid-template-columns: auto auto auto; align-items: center; gap: clamp(10px, 1.6vw, 22px); }
 .nobles { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
 .rows { display: flex; flex-direction: column; gap: calc(var(--cw) * 0.09); }
 .row { display: flex; gap: calc(var(--cw) * 0.09); }
@@ -340,7 +345,7 @@ button { cursor: pointer; }
 .tray.is-mine.is-fresh { animation: yourturn 1.4s ease-out; }
 @keyframes yourturn { 0% { box-shadow: 0 0 0 0 rgba(233, 201, 127, 0.7); } 100% { box-shadow: 0 0 0 14px rgba(233, 201, 127, 0); } }
 .tray__text { flex: 1; min-width: 220px; }
-.tray__title { font: 400 21px/1.15 var(--font-display); color: var(--ivory); }
+.tray__title { font: 700 17px/1.25 var(--font-ui); color: var(--ivory); }
 .tray__hint { font-size: 13.5px; color: var(--text-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tray__hint .gem { display: inline-block; width: 16px; height: 16px; vertical-align: -3px; margin: 0 1px; }
 .tray__hint strong { color: var(--text); font-weight: 600; }
@@ -394,7 +399,7 @@ button { cursor: pointer; }
 
 /* ---------- side column ---------- */
 
-.opps { display: flex; flex-direction: column; gap: 10px; flex: none; max-height: 72%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--velvet-500) transparent; }
+.opps { display: flex; flex-direction: column; gap: 10px; flex: none; max-height: 72%; overflow-x: hidden; overflow-y: auto; padding: 4px; margin: -4px; scrollbar-width: thin; scrollbar-color: var(--velvet-500) transparent; }
 .opp .reserved { margin-top: 10px; }
 .opp .reserved .card, .opp .reserved .deck, .opp .reserved .slot { --cw: 46px; }
 
@@ -454,24 +459,33 @@ button { cursor: pointer; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Desktop: the board is a size container, so cards scale to whatever room
-   the tray and your seat leave and can never spill out of the frame. */
-@media (min-width: 1081px) {
-  .board { container-type: size; }
-  .board > * {
+   the tray and your seat leave and can never spill out of the frame. In a
+   tall, narrow board (a half-width window) the nobles move above the cards,
+   which leaves more width for bigger cards. */
+@media (min-width: 861px) {
+  .board { container: board / size; }
+  .board__in {
     --cw: clamp(52px, min((100cqw - 110px) / 6.75, (100cqh - 34px) / 4.3), 134px);
     --nw: calc(var(--cw) * 0.84);
     --tw: calc(var(--cw) * 0.56);
+  }
+  @container board (aspect-ratio < 1.3) {
+    .board__in {
+      grid-template-columns: auto auto;
+      --cw: clamp(52px, min((100cqw - 90px) / 5.95, (100cqh - 60px) / 5.2), 134px);
+    }
+    .nobles { grid-column: 1 / -1; flex-direction: row; justify-content: center; }
   }
 }
 
 /* ---------- mid widths: side column folds under ---------- */
 
-@media (max-width: 1080px) {
+@media (max-width: 860px) {
   :root { --cw: clamp(64px, (100vw - 130px) / 6.9, 116px); }
   .opp .holdings, .opp .holdings__foot { max-width: 400px; }
   .game { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; height: auto; min-height: 100dvh; }
   .side { display: contents; }
-  .opps { order: -1; grid-row: 2; flex-direction: row; overflow-x: auto; }
+  .opps { order: -1; grid-row: 2; flex-direction: row; max-height: none; overflow-x: auto; overflow-y: hidden; }
   .opps .opp { flex: 1 0 280px; }
   .main { grid-row: 3; }
   .feed { grid-row: 4; min-height: 280px; max-height: 420px; }
@@ -486,10 +500,9 @@ button { cursor: pointer; }
   .game { padding: 8px 8px 16px; gap: 8px; }
   .topbar { gap: 8px; }
   .topbar__mark { font-size: 22px; }
-  .netstate span { display: none; }
   .turnpill { padding: 5px 12px; font-size: 13px; }
-  .turnpill__round { display: none; }
-  .board { grid-template-columns: 1fr; justify-items: center; padding: 10px 6px; gap: 12px; }
+  .board { padding: 10px 6px; }
+  .board__in { grid-template-columns: 1fr; justify-items: center; gap: 12px; }
   .nobles { flex-direction: row; justify-content: center; flex-wrap: wrap; gap: 6px; order: 0; }
   .rows { order: 1; }
   .bank { order: 2; flex-direction: row; gap: 8px; }
@@ -502,7 +515,7 @@ button { cursor: pointer; }
   .tray__hint { white-space: normal; }
     .opps .opp { flex: 1 0 86%; }
   .sheet { padding: 20px; }
-  .sheet__title { font-size: 28px; }
+  .sheet__title { font-size: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

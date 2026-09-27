@@ -210,9 +210,9 @@ function take(s, pi, gems) {
     const c = colors[0];
     if (s.bank[c] < 4) fail(`Taking two ${COLOR_NAMES[c]}s needs at least 4 in the bank.`);
   } else {
-    if (colors.length !== gems.length) fail('Take different colours, or two of the same colour.');
+    if (colors.length !== gems.length) fail('Take different colors, or two of the same color.');
     for (const c of colors) if (s.bank[c] < 1) fail(`No ${COLOR_NAMES[c]}s left.`);
-    if (gems.length < distinctNeeded) fail(`Take ${distinctNeeded} different colours.`);
+    if (gems.length < distinctNeeded) fail(`Take ${distinctNeeded} different colors.`);
   }
 
   const p = s.players[pi];

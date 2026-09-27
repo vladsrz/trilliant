@@ -44,7 +44,7 @@ function Fence({ children }) {
   if (error) {
     return html`<${Notice} title="Something broke on this page"
       actions=${html`<button class="btn btn--primary" onClick=${() => location.reload()}>Reload</button>`}>
-      Reloading picks the table back up where it was.</${Notice}>`;
+      Reloading picks the game back up where it was.</${Notice}>`;
   }
   return children;
 }
@@ -67,9 +67,9 @@ function App() {
 
   let screen;
   if (bad) {
-    screen = html`<${Notice} title="That link doesn’t open a table"
+    screen = html`<${Notice} title="That link doesn’t work"
       actions=${html`<a class="btn btn--primary" href="./#">Back to start</a>`}>
-      The invite link looks cut off. Ask for it again, or open your own table.</${Notice}>`;
+      It looks cut off. Ask for the link again, or create your own game.</${Notice}>`;
   } else if (route) {
     screen = html`<${RoomScreen} key=${route.secret + route.hostId} ...${route} notify=${notify} />`;
   } else {
@@ -95,7 +95,7 @@ function HomeScreen({ notify }) {
       const { identity } = await resolveIdentity(storage, room.id);
       location.hash = `${secret}.${identity.id}`;
     } catch {
-      notify('Couldn’t open a table in this browser.');
+      notify('Couldn’t create a game in this browser.');
       setBusy(false);
     }
   };
@@ -140,9 +140,9 @@ function RoomScreen({ secret, hostId, notify }) {
       const refresh = () => {
         const s = room.snapshot();
         setSnap(s);
-        // Keep "Your tables" on the start page labelled with who's at the table.
+        // Keep "Your games" on the start page labelled with who is playing.
         const others = (s.lobby?.seats || []).filter((x) => x.id !== s.selfId).map((x) => x.name);
-        const title = others.length ? `Table with ${others.join(', ')}` : s.role === 'host' ? 'Your table' : '';
+        const title = others.length ? `Game with ${others.join(', ')}` : s.role === 'host' ? 'Your game' : '';
         if (title !== titleKey) {
           titleKey = title;
           rememberTable(storage, { roomId: r.id, secret, hostId, role: room.role, title });
@@ -176,6 +176,12 @@ function RoomScreen({ secret, hostId, notify }) {
   const room = roomRef.current;
   const goHome = () => { location.hash = ''; };
   const onLeave = () => setConfirmLeave(true);
+  // A guest leaving the lobby gives the seat back; mid-game the seat is kept
+  // so they can rejoin, since the game can't go on without them.
+  const leaveNow = async () => {
+    if (snap?.role === 'guest' && snap.lobby?.status === 'lobby') await room?.leaveSeat();
+    goHome();
+  };
   const onRename = (v) => {
     const clean = cleanName(v);
     saveName(storage, clean);
@@ -184,11 +190,11 @@ function RoomScreen({ secret, hostId, notify }) {
   };
 
   if (phase === 'broken') {
-    return html`<${Notice} title="That link doesn’t open a table" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
-      The invite link looks damaged. Ask for it again.</${Notice}>`;
+    return html`<${Notice} title="That link doesn’t work" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
+      It looks damaged. Ask for the link again.</${Notice}>`;
   }
   if (phase === 'conflict') {
-    return html`<${Notice} title="This table is open in another tab"
+    return html`<${Notice} title="This game is open in another tab"
       actions=${html`<button class="btn" onClick=${goHome}>Back to start</button>
         <button class="btn btn--primary" onClick=${() => { setPhase('connecting'); setForceNew(true); }}>Join as another player</button>`}>
       Keep playing in that tab, or join from this one as a separate player.</${Notice}>`;
@@ -201,28 +207,38 @@ function RoomScreen({ secret, hostId, notify }) {
     screen = html`<${Connecting} snap=${snap} waited=${waited} />`;
   } else if (snap.seated && snap.game && lobby.status !== 'lobby') {
     screen = html`<${Game} snap=${snap} room=${room} onLeave=${onLeave} notify=${notify} />`;
-  } else if (lobby.status === 'lobby') {
+  } else if (lobby.status === 'lobby' && snap.seated) {
     screen = html`<${Lobby} snap=${snap} room=${room} name=${name} onRename=${onRename} onLeave=${onLeave} notify=${notify} />`;
+  } else if (lobby.status === 'lobby' && lobby.seats.length >= lobby.max) {
+    screen = html`<${Notice} title="This game is full" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
+      All ${lobby.max} seats are taken. Keep this page open to grab one if it frees up, or create your own game.</${Notice}>`;
+  } else if (lobby.status === 'lobby' && waited) {
+    screen = html`<${Notice} title="You can’t join this game" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
+      The host may have removed you. Ask them about it, or create your own game.</${Notice}>`;
+  } else if (lobby.status === 'lobby') {
+    screen = html`<${Connecting} snap=${snap} waited=${false} />`;
   } else {
     const hostName = lobby.seats.find((s) => s.host)?.name || 'The host';
-    screen = html`<${Notice} title="This table is mid-game" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
-      ${hostName} is playing with ${lobby.seats.filter((s) => !s.host).map((s) => s.name).join(', ') || 'someone'} right now. Keep this page open and you’ll get a seat when they return to the lobby.</${Notice}>`;
+    screen = html`<${Notice} title="This game already started" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
+      Keep this page open and you’ll get a seat for the next one.</${Notice}>`;
   }
 
   const hostName = lobby?.seats.find((s) => s.host)?.name || 'The host';
   return html`
     ${screen}
-    ${snap.role === 'guest' && snap.synced && !snap.hostOnline ? html`<div class="banner" role="status">${hostName} is offline. The table resumes when they’re back.</div>` : null}
+    ${snap.role === 'guest' && snap.synced && !snap.hostOnline ? html`<div class="banner" role="status">${hostName} is offline. The game continues when they’re back.</div>` : null}
     ${snap.link && !snap.link.up && snap.synced ? html`<div class="banner" role="status">Connection lost. Reconnecting…</div>` : null}
     ${confirmLeave ? html`<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="leave-title">
       <section class="panel sheet notice">
-        <h2 class="sheet__title" id="leave-title">Leave the table?</h2>
+        <h2 class="sheet__title" id="leave-title">Leave the game?</h2>
         <p class="sheet__sub">${snap.role === 'host'
-          ? 'Your browser runs this table, so it pauses until you open it again. It stays under “Your tables” on the start page.'
-          : 'You keep your seat. Open the same link to come back.'}</p>
+          ? 'Everyone waits until you come back. You can reopen it from “Your games” on the start page.'
+          : lobby?.status === 'lobby'
+            ? 'You’ll give up your seat. The same link lets you rejoin.'
+            : 'The game waits for you. Open the same link to jump back in.'}</p>
         <div class="sheet__actions">
           <button class="btn" onClick=${() => setConfirmLeave(false)}>Stay</button>
-          <button class="btn btn--primary" onClick=${goHome}>Leave</button>
+          <button class="btn btn--danger-solid" onClick=${leaveNow}>Leave</button>
         </div>
       </section>
     </div>` : null}`;
