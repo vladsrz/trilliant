@@ -228,6 +228,9 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
               </div>`
             : html`<span class="setting__value">${timer.name}</span>`}
         </div>
+        <details class="more">
+          <summary class="more__toggle">More settings</summary>
+          <div class="more__body">
         <div class="setting">
           <span class="setting__label">Hints<span class="setting__hint">Mark cards you can buy and show what you’re short</span></span>
           ${isHost
@@ -246,6 +249,8 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
               </div>`
             : html`<span class="setting__value">${lobby.hideReserves ? 'Hidden' : 'Shown'}</span>`}
         </div>
+          </div>
+        </details>
       </div>
 
       <div class="lobby__actions">
