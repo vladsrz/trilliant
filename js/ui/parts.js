@@ -9,12 +9,12 @@ export const cls = (...xs) => xs.filter(Boolean).join(' ');
 export const ROMAN = { 1: 'I', 2: 'II', 3: 'III' };
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-export function Gem({ color, cls: extra = '', title }) {
-  return html`<svg class=${cls('gem', extra)} viewBox="0 0 64 64" role=${title ? 'img' : undefined} aria-label=${title} aria-hidden=${title ? undefined : 'true'}><use href=${`#gem-${color}`} /></svg>`;
+export function Gem({ color, cls: extra = '', title, fxKey }) {
+  return html`<svg class=${cls('gem', extra)} data-fx-key=${fxKey} viewBox="0 0 64 64" role=${title ? 'img' : undefined} aria-label=${title} aria-hidden=${title ? undefined : 'true'}><use href=${`#gem-${color}`} /></svg>`;
 }
 
-export function Chip({ color, n, hideZero = false }) {
-  return html`<span class=${cls('chip', `chip--${color}`, !n && 'is-zero')}>${hideZero && !n ? '' : n}</span>`;
+export function Chip({ color, n, hideZero = false, fxKey }) {
+  return html`<span class=${cls('chip', `chip--${color}`, !n && 'is-zero')} data-fx-key=${fxKey}>${hideZero && !n ? '' : n}</span>`;
 }
 
 export function cardLabel(card) {
@@ -24,13 +24,14 @@ export function cardLabel(card) {
 }
 
 // A development card. Rendered as a button only when it can be acted on.
-export function Card({ id, onClick, buyable, selected, isNew, flash, covered, size }) {
+export function Card({ id, onClick, buyable, selected, isNew, flash, covered, size, fxKey }) {
   const card = CARDS[id];
   const Tag = onClick ? 'button' : 'div';
   const style = size ? `--cw:${size}px` : undefined;
   return html`<${Tag}
       type=${onClick ? 'button' : undefined}
       class=${cls('card', `card--${card.color}`, onClick && 'is-clickable', buyable && 'is-buyable', selected && 'is-selected', isNew && 'is-new', flash && 'is-flash')}
+      data-fx-key=${fxKey}
       style=${style}
       onClick=${onClick}
       aria-label=${cardLabel(card)}
@@ -51,12 +52,13 @@ export function Card({ id, onClick, buyable, selected, isNew, flash, covered, si
   <//>`;
 }
 
-export function Deck({ level, count, onClick, selected, flash, hiddenCard }) {
+export function Deck({ level, count, onClick, selected, flash, hiddenCard, fxKey }) {
   const Tag = onClick ? 'button' : 'div';
   const label = hiddenCard ? `Face-down level ${level} card` : `Level ${level} deck, ${plural(count, 'card')} left`;
   return html`<${Tag}
       type=${onClick ? 'button' : undefined}
       class=${cls('deck', onClick && 'is-clickable', selected && 'is-selected', flash && 'is-flash', !hiddenCard && count === 0 && 'is-empty')}
+      data-fx-key=${fxKey}
       onClick=${onClick}
       aria-label=${label}
       aria-pressed=${onClick ? String(!!selected) : undefined}
@@ -66,12 +68,12 @@ export function Deck({ level, count, onClick, selected, flash, hiddenCard }) {
   <//>`;
 }
 
-export function Noble({ id, onClick, flash }) {
+export function Noble({ id, onClick, flash, fxKey }) {
   const n = NOBLES[id];
   const Tag = onClick ? 'button' : 'div';
   const req = COLORS.filter((c) => n.req[c] > 0);
   const label = `Noble, 3 points. Needs ${req.map((c) => `${n.req[c]} ${COLOR_NAMES[c]} cards`).join(', ')}.`;
-  return html`<${Tag} type=${onClick ? 'button' : undefined} class=${cls('noble', onClick && 'is-choice', flash && 'is-flash')} onClick=${onClick} aria-label=${label} role=${onClick ? undefined : 'img'}>
+  return html`<${Tag} type=${onClick ? 'button' : undefined} class=${cls('noble', onClick && 'is-choice', flash && 'is-flash')} data-fx-key=${fxKey} onClick=${onClick} aria-label=${label} role=${onClick ? undefined : 'img'}>
     <span class="noble__pts">${n.points}</span>
     <span class="noble__req">${req.map((c) => html`<${Chip} color=${c} n=${n.req[c]} />`)}</span>
   <//>`;
@@ -86,7 +88,7 @@ export function Well({ color, count, onClick, picked, flash }) {
       onClick=${onClick}
       aria-label=${`${count} ${name}${count === 1 ? '' : 's'} in the bank${picked ? `, ${picked} picked` : ''}`}
       role=${onClick ? undefined : 'img'}>
-    <${Gem} color=${color} />
+    <${Gem} color=${color} fxKey=${`bank:${color}`} />
     <span class="well__count">${count}</span>
   <//>`;
 }
@@ -100,7 +102,7 @@ export function Holdings({ player, onGem, marked }) {
       const left = n - (marked?.[c] || 0);
       const clickable = onGem && n > 0;
       return html`<div class=${cls('hold', !n && 'is-zero')}>
-        ${c === 'gold' ? html`<span class="chip" style="visibility:hidden">0</span>` : html`<${Chip} color=${c} n=${b[c]} hideZero />`}
+        ${c === 'gold' ? html`<span class="chip" style="visibility:hidden">0</span>` : html`<${Chip} color=${c} n=${b[c]} hideZero fxKey=${`bonus:${player.id}:${c}`} />`}
         <span
           class=${cls('hold__gem', clickable && 'is-clickable', marked?.[c] && 'is-picked')}
           role=${clickable ? 'button' : undefined}
@@ -108,7 +110,7 @@ export function Holdings({ player, onGem, marked }) {
           aria-label=${`${n} ${COLOR_NAMES[c]}${marked?.[c] ? `, ${marked[c]} marked to return` : ''}`}
           onClick=${clickable ? () => onGem(c) : undefined}
           onKeyDown=${clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onGem(c); } } : undefined}>
-          <${Gem} color=${c} />${(marked ? left : n) ? html`<b>${marked ? left : n}</b>` : null}
+          <${Gem} color=${c} fxKey=${`hold:${player.id}:${c}`} />${(marked ? left : n) ? html`<b>${marked ? left : n}</b>` : null}
         </span>
       </div>`;
     })}
@@ -124,6 +126,7 @@ export function Reserved({ player, isYou, onPick, selectedId, canAfford, size })
     }
     slots.push(html`<${Card}
       id=${r.id}
+      fxKey=${`reserve:${player.id}:${r.id}`}
       size=${size}
       onClick=${isYou && onPick ? () => onPick(r.id) : undefined}
       selected=${selectedId === r.id}
@@ -136,7 +139,7 @@ export function Reserved({ player, isYou, onPick, selectedId, canAfford, size })
 export function SeatCard({ player, view, online, bot, isTurn, flash }) {
   const pts = pointsOf(player);
   const held = tokenTotal(player.tokens);
-  return html`<section class=${cls('panel', 'seatcard', 'opp', isTurn && 'is-turn', flash && 'is-flash')} aria-label=${`${player.name}, ${plural(pts, 'point')}`}>
+  return html`<section class=${cls('panel', 'seatcard', 'opp', isTurn && 'is-turn', flash && 'is-flash')} data-fx-key=${`player:${player.id}`} aria-label=${`${player.name}, ${plural(pts, 'point')}`}>
     <div class="seatcard__head">
       <span class="seatcard__name">${player.name}</span>
       ${bot ? html`<span class="seat__tag">Bot</span>` : null}

@@ -18,6 +18,8 @@ The host's browser runs the game, so the host keeps that tab open. If it closes,
 
 Bots are controlled by the host's browser. They take their turns automatically, including when playing offline against bots alone. They keep their seats and win counts if the host reloads or plays again.
 
+Accepted moves animate gems, cards and nobles from the board to the player who receives them (or back to the bank when spent). The speaker button in a game mutes the short sound cues; its setting is saved in this browser. Reduced-motion settings turn off the moving pieces.
+
 **Game settings** (host, in the lobby): **Points to win** anywhere from 15 (default) to 30 on a slider, and a **Turn timer** of Slow 3 min (default), Normal 2 min, Fast 1 min or Off, like geminist's speeds.
 
 **Turn timer:** the clock shows next to whose turn it is and goes red in the last 30 seconds. At zero that turn is skipped; if the player was mid put-back or choosing a noble, it's finished for them. The clock pauses while the host is away.

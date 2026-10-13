@@ -216,13 +216,17 @@ button { cursor: pointer; }
 }
 .topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-height: 44px; }
 .topbar__mark { font: 400 26px/1 var(--font-display); color: var(--ivory); margin: 0; }
-.topbar__status { flex: 1; display: flex; justify-content: center; }
+.topbar__status { flex: 1; min-width: 0; display: flex; justify-content: center; }
 .topbar__tools { display: flex; align-items: center; gap: 8px; }
+.topbar__sound { width: 34px; height: 34px; border: 1px solid var(--line); }
+.topbar__sound:hover { border-color: var(--brass); }
 .turnpill {
   display: inline-flex; align-items: center; gap: 10px; padding: 6px 16px; border-radius: 999px;
+  min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   background: rgba(0, 0, 0, 0.25); border: 1px solid var(--line); font-weight: 600; font-size: 14px;
 }
 .turnpill.is-mine { color: #241809; border-color: transparent; background: #d4b06a; }
+.turnpill__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .turnpill__final { color: var(--warn); }
 .turnpill__clock { font-variant-numeric: tabular-nums; font-weight: 700; opacity: 0.85; min-width: 2.6em; text-align: right; }
 .turnpill.is-warn { border-color: rgba(233, 115, 99, 0.7); }
@@ -374,9 +378,11 @@ button { cursor: pointer; }
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
 }
 .well.is-clickable:hover .gem { transform: translateY(-3px) scale(1.04); }
+.well.is-clickable:active .gem { transform: translateY(1px) scale(0.94); }
 .well.is-empty .gem { opacity: 0.16; filter: grayscale(1); }
 .well.is-empty .well__count { background: var(--velvet-500); color: var(--text-faint); }
 .well.is-picked { box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6), 0 0 0 2px var(--brass-hi); }
+.well.is-picked .gem { transform: translateY(-5px) scale(1.1); }
 .well--gold { margin-bottom: calc(var(--tw) * 0.14); }
 
 /* ---------- tray ---------- */

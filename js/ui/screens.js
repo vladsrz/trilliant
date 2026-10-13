@@ -8,6 +8,8 @@ import { Gem, Card, Deck, Noble, Well, Holdings, Reserved, SeatCard, LogItem, cl
 import { NAME_MAX, CHAT_MAX } from '../net/room.js';
 import { MIN_TARGET, MAX_TARGET } from '../engine.js';
 import { every } from '../net/ticker.js';
+import { capturePieces, animateMove } from './motion.js';
+import { unlockAudio, playMoveSound } from './sound.js';
 
 const TIMER_OPTIONS = [
   { sec: 180, name: 'Slow', time: '3 min' },
@@ -18,6 +20,8 @@ const TIMER_OPTIONS = [
 
 const PencilIcon = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>`;
 const CrossIcon = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>`;
+const SpeakerIcon = html`<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/></svg>`;
+const MuteIcon = html`<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="m16 9 5 6m0-6-5 6"/></svg>`;
 
 // A round badge with the player's first letter: marks player rows at a glance.
 function Avatar({ name, me, off }) {
@@ -284,7 +288,23 @@ export function Game({ snap, room, onLeave, notify }) {
   const [err, setErr] = useState(null);
   const [showResult, setShowResult] = useState(over);
   const [fresh, setFresh] = useState(false);
+  const [soundOn, setSoundOn] = useState(() => {
+    try { return localStorage.getItem('trilliant:sound') !== 'off'; } catch { return true; }
+  });
   const fx = useChanges(g, you);
+  const gameRoot = useRef(null);
+  const motionPrev = useRef(null);
+
+  useEffect(() => {
+    const root = gameRoot.current;
+    if (!root) return;
+    const prev = motionPrev.current;
+    if (prev && g.version === prev.game.version + 1 && g.players.length === prev.game.players.length) {
+      const entries = animateMove(prev.game, g, prev.pieces, root);
+      if (soundOn) playMoveSound(entries);
+    }
+    motionPrev.current = { game: g, pieces: capturePieces(root) };
+  }, [g.version]);
 
   useEffect(() => { setPicks([]); setSel(null); setMarked({}); setErr(null); }, [g.version]);
   useEffect(() => { if (over) setShowResult(true); }, [over]);
@@ -363,13 +383,24 @@ export function Game({ snap, room, onLeave, notify }) {
   for (let k = 1; k < g.players.length; k++) opponents.push((you + k) % g.players.length);
   const seatOf = (id) => snap.lobby?.seats.find((s) => s.id === id);
 
-  return html`<div class="game">
+  const toggleSound = () => {
+    const next = !soundOn;
+    if (next) unlockAudio();
+    setSoundOn(next);
+    try { localStorage.setItem('trilliant:sound', next ? 'on' : 'off'); } catch { /* sound still toggles */ }
+  };
+
+  return html`<div class="game" ref=${gameRoot} onPointerDownCapture=${() => { if (soundOn) unlockAudio(); }}>
     <header class="topbar">
       <p class="topbar__mark">Trilliant</p>
       <div class="topbar__status" aria-live="polite">
         <${TurnPill} g=${g} myTurn=${myTurn} over=${over} current=${current} timer=${snap.timer} />
       </div>
       <div class="topbar__tools">
+        <button type="button" class="icon-btn topbar__sound" onClick=${toggleSound}
+          aria-label=${soundOn ? 'Mute game sounds' : 'Turn on game sounds'} title=${soundOn ? 'Mute game sounds' : 'Turn on game sounds'}>
+          ${soundOn ? SpeakerIcon : MuteIcon}
+        </button>
         <button type="button" class="btn btn--small btn--danger" onClick=${onLeave}>Leave game</button>
       </div>
     </header>
@@ -377,16 +408,18 @@ export function Game({ snap, room, onLeave, notify }) {
     <div class="main">
       <section class="board" aria-label="Board"><div class="board__in">
         <div class="nobles" aria-label="Nobles">
-          ${g.nobles.map((id) => html`<${Noble} id=${id} />`)}
+          ${g.nobles.map((id) => html`<${Noble} id=${id} fxKey=${`noble:${id}`} />`)}
         </div>
         <div class="rows">
           ${[3, 2, 1].map((level) => html`<div class="row">
             <${Deck} level=${level} count=${g.deckCounts[level]}
+              fxKey=${`deck:${level}`}
               onClick=${playing && g.deckCounts[level] && me.reserved.length < MAX_RESERVED ? () => clickDeck(level) : undefined}
               selected=${sel?.kind === 'deck' && sel.level === level} />
             ${g.board[level].map((id, i) => (id === null
               ? html`<div class="slot" aria-label="Empty"></div>`
               : html`<${Card} id=${id}
+                  fxKey=${`board:${id}`}
                   onClick=${playing ? () => clickCard(id, 'board') : undefined}
                   selected=${sel?.kind === 'card' && sel.id === id}
                   buyable=${myTurn && g.phase === 'play' && affordable(id)}
@@ -413,7 +446,7 @@ export function Game({ snap, room, onLeave, notify }) {
         onPass=${() => send({ type: 'pass' })}
         onResults=${() => setShowResult(true)} />
 
-      <section class="panel seatcard me" aria-label="Your seat">
+      <section class="panel seatcard me" data-fx-key=${`player:${me.id}`} aria-label="Your seat">
         <div class="me__main">
           <div class="seatcard__head">
             <span class="seatcard__name">${me.name} <span class="seat__you">(you)</span></span>
@@ -470,7 +503,7 @@ function TurnPill({ g, myTurn, over, current, timer }) {
     return () => { document.removeEventListener('visibilitychange', update); document.title = base; };
   }, [myTurn, left]);
   return html`<span class=${cls('turnpill', myTurn && 'is-mine', warn && 'is-warn')}>
-    ${over ? 'Game over' : myTurn ? 'Your turn' : `${current.name}’s turn`}
+    <span class="turnpill__label">${over ? 'Game over' : myTurn ? 'Your turn' : `${current.name}’s turn`}</span>
     ${left !== null ? html`<span class="turnpill__clock" title="Time left this turn">${clock(left)}</span>` : null}
     ${g.finalRound && !over ? html`<span class="turnpill__final">Last round</span>` : null}
   </span>`;
