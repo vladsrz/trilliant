@@ -228,6 +228,15 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
               </div>`
             : html`<span class="setting__value">${timer.name}</span>`}
         </div>
+        <div class="setting">
+          <span class="setting__label">Hints<span class="setting__hint">Mark cards you can buy and show what you’re short</span></span>
+          ${isHost
+            ? html`<div class="segmented" role="radiogroup" aria-label="Hints">
+                ${[[false, 'Off'], [true, 'On']].map(([on, label]) => html`<button type="button" role="radio" aria-checked=${String(!!lobby.hints === on)}
+                  class=${cls(!!lobby.hints === on && 'is-on')} onClick=${() => room.setHints(on)}>${label}</button>`)}
+              </div>`
+            : html`<span class="setting__value">${lobby.hints ? 'On' : 'Off'}</span>`}
+        </div>
       </div>
 
       <div class="lobby__actions">
@@ -334,6 +343,7 @@ export function Game({ snap, room, onLeave, notify }) {
   const playing = myTurn && g.phase === 'play' && !busy;
   const rules = takeRules(g.bank);
   const bonuses = bonusesOf(me);
+  const hints = !!snap.lobby?.hints;
   const affordable = (id) => !!autoPayment(me, CARDS[id]);
 
   // ----- gem picking -----
@@ -422,7 +432,7 @@ export function Game({ snap, room, onLeave, notify }) {
                   fxKey=${`board:${id}`}
                   onClick=${playing ? () => clickCard(id, 'board') : undefined}
                   selected=${sel?.kind === 'card' && sel.id === id}
-                  buyable=${myTurn && g.phase === 'play' && affordable(id)}
+                  buyable=${hints && myTurn && g.phase === 'play' && affordable(id)}
                   covered=${myTurn ? bonuses : undefined}
                   isNew=${fx.dealt.has(`${level}-${i}`)}
                   flash=${fx.slots.has(`${level}-${i}`)} />`))}
@@ -444,6 +454,7 @@ export function Game({ snap, room, onLeave, notify }) {
         onReserveDeck=${(level) => send({ type: 'reserve', level })}
         onReturn=${() => send({ type: 'discard', gems: Object.fromEntries(Object.entries(marked).filter(([, n]) => n > 0)) })}
         onPass=${() => send({ type: 'pass' })}
+        hints=${hints}
         onResults=${() => setShowResult(true)} />
 
       <section class="panel seatcard me" data-fx-key=${`player:${me.id}`} aria-label="Your seat">
@@ -463,7 +474,7 @@ export function Game({ snap, room, onLeave, notify }) {
           <${Reserved} player=${me} isYou
             onPick=${playing ? (id) => clickCard(id, 'reserve') : undefined}
             selectedId=${sel?.kind === 'card' ? sel.id : null}
-            canAfford=${myTurn && g.phase === 'play' ? affordable : undefined} />
+            canAfford=${hints && myTurn && g.phase === 'play' ? affordable : undefined} />
         </div>` : null}
       </section>
     </div>
@@ -552,7 +563,7 @@ function Tray(p) {
     const pay = autoPayment(me, card);
     const canReserve = sel.from === 'board' && me.reserved.length < MAX_RESERVED;
     title = `Level ${ROMAN[card.level]} ${COLOR_NAMES[card.color]}${card.points ? ` · ${card.points} point${card.points > 1 ? 's' : ''}` : ''}`;
-    hint = pay ? html`<${PayLine} pay=${pay} />` : html`<${ShortLine} me=${me} card=${card} />`;
+    hint = pay ? html`<${PayLine} pay=${pay} />` : p.hints ? html`<${ShortLine} me=${me} card=${card} />` : 'You can’t afford this yet.';
     buttons = html`
       <button type="button" class=${cls('btn', pay && 'btn--primary')} disabled=${busy || !pay} onClick=${() => p.onBuy(sel.id)}>Buy</button>
       ${sel.from === 'board' ? html`<button type="button" class=${cls('btn', !pay && 'btn--primary')} disabled=${busy || !canReserve} onClick=${() => p.onReserveCard(sel.id)}

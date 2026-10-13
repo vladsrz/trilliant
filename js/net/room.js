@@ -105,7 +105,7 @@ export class HostRoom extends Emitter {
       game: null,
       chat: [],
       tally: {},
-      settings: { turnSeconds: DEFAULT_TURN_SECONDS, target: WIN_POINTS },
+      settings: { turnSeconds: DEFAULT_TURN_SECONDS, target: WIN_POINTS, hints: false },
       rev: 1,
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
@@ -176,6 +176,7 @@ export class HostRoom extends Emitter {
       max: MAX_PLAYERS,
       turnSeconds: this.turnSeconds,
       target: this.target,
+      hints: this.hints,
       seats: r.seats.map((s) => ({ id: s.id, name: s.name, host: s.id === r.hostId, online: this.isOnline(s.id), bot: !!s.bot })),
     };
   }
@@ -192,6 +193,18 @@ export class HostRoom extends Emitter {
     const r = this.record;
     if (r.status === 'playing' || !isValidTarget(points) || points === this.target) return;
     r.settings = { ...(r.settings || {}), target: points };
+    this.bump();
+  }
+
+  // Hints mark the cards a player can buy and spell out what they are short.
+  // Off unless the host turns them on.
+  get hints() { return this.record.settings?.hints === true; }
+
+  setHints(on) {
+    if (this.expireIfIdle()) return;
+    const r = this.record;
+    if (r.status === 'playing' || typeof on !== 'boolean' || on === this.hints) return;
+    r.settings = { ...(r.settings || {}), hints: on };
     this.bump();
   }
 

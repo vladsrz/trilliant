@@ -90,6 +90,19 @@ test('a player who has to put gems back gets at least 30 more seconds', async ()
   host.stop();
 });
 
+test('hints are off by default and only the host changes them, in the lobby', async () => {
+  const { host } = await table();
+  assert.equal(host.lobbyPublic().hints, false);
+  host.setHints('yes');
+  assert.equal(host.hints, false, 'only true or false');
+  host.setHints(true);
+  assert.equal(host.lobbyPublic().hints, true);
+  assert.ok(host.startGame().ok);
+  host.setHints(false);
+  assert.equal(host.hints, true, 'no changes mid-game');
+  host.stop();
+});
+
 test('timer off means no clock and no timeouts', async () => {
   const { host } = await table();
   host.setTimer(0);
