@@ -232,7 +232,7 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
           <summary class="more__toggle">More settings</summary>
           <div class="more__body">
         <div class="setting">
-          <span class="setting__label">Hints<span class="setting__hint">Mark cards you can buy and show what you’re short</span></span>
+          <span class="setting__label">Hints<span class="setting__hint">Show which gems you’re short for a card</span></span>
           ${isHost
             ? html`<div class="segmented" role="radiogroup" aria-label="Hints">
                 ${[[false, 'Off'], [true, 'On']].map(([on, label]) => html`<button type="button" role="radio" aria-checked=${String(!!lobby.hints === on)}
@@ -439,7 +439,7 @@ export function Game({ snap, room, onLeave, notify }) {
                   fxKey=${`board:${id}`}
                   onClick=${playing ? () => clickCard(id, 'board') : undefined}
                   selected=${sel?.kind === 'card' && sel.id === id}
-                  buyable=${hints && myTurn && g.phase === 'play' && affordable(id)}
+                  buyable=${myTurn && g.phase === 'play' && affordable(id)}
                   covered=${myTurn ? bonuses : undefined}
                   isNew=${fx.dealt.has(`${level}-${i}`)}
                   flash=${fx.slots.has(`${level}-${i}`)} />`))}
@@ -484,7 +484,7 @@ export function Game({ snap, room, onLeave, notify }) {
           <${Reserved} player=${me} isYou
             onPick=${playing ? (id) => clickCard(id, 'reserve') : undefined}
             selectedId=${sel?.kind === 'card' ? sel.id : null}
-            canAfford=${hints && myTurn && g.phase === 'play' ? affordable : undefined} />
+            canAfford=${myTurn && g.phase === 'play' ? affordable : undefined} />
         </div>` : null}
       </section>
       </div>

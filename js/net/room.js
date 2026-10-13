@@ -196,7 +196,7 @@ export class HostRoom extends Emitter {
     this.bump();
   }
 
-  // Hints mark the cards a player can buy and spell out what they are short.
+  // Hints spell out which gems a player is short for a card they can't afford.
   // Off unless the host turns them on.
   get hints() { return this.record.settings?.hints === true; }
 
