@@ -236,6 +236,8 @@ button { cursor: pointer; }
 .turnpill.is-mine .turnpill__final { color: #7a2a12; }
 
 .main { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
+/* Wraps the tray and your seat. Transparent to layout unless there is room to set them side by side. */
+.dock { display: contents; }
 .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 
 /* ---------- board ---------- */
@@ -288,9 +290,18 @@ button { cursor: pointer; }
 .cost.is-covered .gem { opacity: 0.45; }
 
 .card.is-clickable:hover { transform: translateY(-2px); }
+@media (hover: hover) {
+  .card.is-clickable:hover, .deck.is-clickable:hover { box-shadow: 0 0 0 1.5px rgba(255, 226, 150, 0.9), 0 0 16px rgba(255, 214, 110, 0.4); }
+  .well.is-clickable:hover { box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6), 0 0 0 1.5px rgba(255, 226, 150, 0.55), 0 0 14px rgba(255, 214, 110, 0.3); }
+}
 /* A saturated ring held off the card by a dark gap: a brass line flush against an ivory card disappears. */
 .card.is-buyable { outline: max(2px, calc(var(--cw) * 0.025)) solid #ffcf3d; outline-offset: calc(var(--cw) * 0.016); }
-.card.is-selected { transform: translateY(-4px); box-shadow: 0 0 0 3px var(--brass-hi), 0 10px 20px rgba(0, 0, 0, 0.45); }
+/* Selected is the loudest state: a thicker ring than buyable, lifted, with a glow. */
+.card.is-selected, .card.is-selected:hover, .deck.is-selected, .deck.is-selected:hover {
+  transform: translateY(-4px);
+  outline: max(3px, calc(var(--cw) * 0.035)) solid #ffcf3d; outline-offset: calc(var(--cw) * 0.016);
+  box-shadow: 0 0 calc(var(--cw) * 0.2) rgba(255, 207, 61, 0.6), 0 10px 20px rgba(0, 0, 0, 0.45);
+}
 .card.is-new { animation: deal 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @keyframes deal { from { opacity: 0; transform: translateY(-14px) scale(0.96); } to { opacity: 1; transform: none; } }
 .card.is-flash::after, .deck.is-flash::after, .well.is-flash::after, .seatcard.is-flash::after {
@@ -322,7 +333,6 @@ button { cursor: pointer; }
 .deck__numeral { font: 400 calc(var(--cw) * 0.44)/1 var(--font-display); letter-spacing: 0.04em; }
 .deck__count { font: 600 calc(var(--cw) * 0.11)/1 var(--font-ui); color: var(--text-mute); }
 .deck.is-clickable:hover { transform: translateY(-2px); border-color: var(--brass); }
-.deck.is-selected { box-shadow: 0 0 0 3px var(--brass-hi), 0 10px 20px rgba(0, 0, 0, 0.45); transform: translateY(-4px); }
 .deck.is-empty { opacity: 0.35; }
 
 /* ---------- nobles ---------- */
@@ -517,6 +527,16 @@ button { cursor: pointer; }
    tall, narrow board (a half-width window) the nobles move above the cards,
    which leaves more width for bigger cards. */
 @media (min-width: 861px) {
+  /* The moves and chat sit on top; opponents sit at the bottom, level with your own seat. */
+  .side .opps { order: 2; }
+  .main { container: main / inline-size; }
+  @container main (min-width: 940px) {
+    .dock { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: stretch; }
+    .dock .tray { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 12px 14px; }
+    .dock .tray__text { flex: none; min-width: 0; width: 100%; }
+    .dock .tray__hint { white-space: normal; }
+    .dock .me__main { width: 340px; }
+  }
   .board { container: board / size; }
   .board__in {
     --cw: clamp(52px, min((100cqw - 110px) / 6.75, (100cqh - 34px) / 4.3), 134px);

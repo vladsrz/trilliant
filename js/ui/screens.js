@@ -446,6 +446,7 @@ export function Game({ snap, room, onLeave, notify }) {
         </div>
       </div></section>
 
+      <div class="dock">
       <${Tray} ...${{ g, me, you, myTurn, over, current, picks, isPair, takeReady, rules, sel, busy, err, fresh, mustReturn, marked, markedTotal, isHost, snap }}
         onTake=${() => send({ type: 'take', gems: picks })}
         onClear=${() => { setPicks([]); setSel(null); setMarked({}); setErr(null); }}
@@ -477,6 +478,7 @@ export function Game({ snap, room, onLeave, notify }) {
             canAfford=${hints && myTurn && g.phase === 'play' ? affordable : undefined} />
         </div>` : null}
       </section>
+      </div>
     </div>
 
     <aside class="side">
