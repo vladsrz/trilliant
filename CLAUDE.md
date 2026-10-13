@@ -9,7 +9,7 @@ Online Splendor-rules game. Static site, no build, no server. Read `README.md` f
 - Shuffles use `secureRandom` (CSPRNG). A seeded RNG is for tests only; a 32-bit seed can be brute-forced from the visible board.
 - Messages that change a seat or make a move are pair-sealed (`hi`, `act`). Only presence (`host`, `knock`, `bye`) rides on the room key alone.
 - Changing `RELAYS` in `js/net/bus.js` means updating `connect-src` in the CSP in `index.html`, or the browser will block the new relay.
-- The host enforces the turn clock (`HostRoom.checkClock`); `applyTimeout` is the only way a turn ends without a move. Guests only display the remaining time the host sends. Timeouts never count as passes.
+- The host enforces the turn clock (`HostRoom.checkClock`); `applyTimeout` is the only way a turn ends without a move. Guests only display the remaining time the host sends. Timeouts never count as passes. The time left is saved with the host record and picked up on reload (`resumeClock`); reloading the host tab must never refill a turn.
 - Names and chat render as text only (Preact escapes). Never `innerHTML` user data; the only `innerHTML` is the static gem sprite.
 - Bots are seats the host plays (`HostRoom.playBots`). A bot decides from `viewFor` its own seat, never the full state, and its move goes through `process` like a guest's. Bot ids contain a colon so they can never equal a player's key fingerprint. A bot must never hold the game up: a refused move falls back to `applyTimeout`, and `botAction` loosens up after a long spell without buying so two bots can't deadlock on each other's gems.
 

@@ -112,6 +112,44 @@ test('a reopened game restarts the clock instead of skipping someone at once', a
   host.stop();
 });
 
+test('reloading the host tab keeps the time left on the turn', async () => {
+  const { host, me, other } = await table();
+  host.start();
+  assert.ok(host.startGame().ok);
+  const g = host.record.game;
+  g.turn = g.players.findIndex((p) => p.id === me.id);
+  host.deadline = Date.now() + 40000;
+  host.checkClock(); // the once-a-second save
+  host.stop();
+
+  const reopen = () => new HostRoom({
+    room: host.room, secret: host.record.secret, identity: me, name: 'Ana',
+    record: loadHostRecord(host.storage, host.room.id), storage: host.storage, relays: [],
+  });
+  const again = reopen();
+  again.start();
+  const left = again.deadline - Date.now();
+  assert.ok(left > 38000 && left <= 40000, `host keeps what was left (${left} ms)`);
+
+  // Almost out of time on the host's own turn: no top-up from a reload.
+  again.deadline = Date.now() + 2000;
+  again.checkClock();
+  again.stop();
+  const third = reopen();
+  third.start();
+  assert.ok(third.deadline - Date.now() <= 2000, 'no grace period for the host');
+
+  // A guest whose turn it is gets time to reconnect.
+  third.record.game.turn = third.record.game.players.findIndex((p) => p.id === other.id);
+  third.deadline = Date.now() + 2000;
+  third.checkClock();
+  third.stop();
+  const fourth = reopen();
+  fourth.start();
+  assert.ok(fourth.deadline - Date.now() > 29000, 'guest gets the grace period');
+  fourth.stop();
+});
+
 test('a lobby expires after one hour without changes, even while its tab is open', async () => {
   const { host } = await table();
   host.start();

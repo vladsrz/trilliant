@@ -124,14 +124,15 @@ export class HostRoom extends Emitter {
 
   start() {
     if (this.expireIfIdle() || this.record.status === 'expired') return;
+    // The clock doesn't run while the host is away, so a reopened game never
+    // skips someone on the spot. It picks up where it stopped: reloading the
+    // host tab must not hand anyone a fresh turn.
+    this.resumeClock();
     this.persist();
     this.bus.start();
     this.stopTicks = every(HEARTBEAT_MS, () => this.tick());
     this.stopClock = every(1000, () => this.checkClock());
     this.stopBots = every(1000, () => this.playBots());
-    // The clock doesn't run while the host is away: a reopened game gives the
-    // current player a fresh turn instead of skipping them on the spot.
-    this.restartClock();
   }
 
   stop() {
@@ -204,6 +205,21 @@ export class HostRoom extends Emitter {
     this.deadline = playing && this.turnSeconds ? Date.now() + this.turnSeconds * 1000 : null;
   }
 
+  // Time left on the current turn, as last saved. A guest also gets the grace
+  // period to reconnect; the host doesn't, or reloading would top up their clock.
+  resumeClock() {
+    const r = this.record;
+    const saved = r.clock;
+    const playing = r.status === 'playing' && r.game;
+    if (!playing || !this.turnSeconds || !saved || saved.version !== r.game.version || !Number.isFinite(saved.left)) {
+      this.restartClock();
+      return;
+    }
+    const hostTurn = r.game.players[r.game.turn]?.id === r.hostId;
+    const left = Math.min(Math.max(saved.left, hostTurn ? 0 : GRACE_MS), this.turnSeconds * 1000);
+    this.deadline = Date.now() + left;
+  }
+
   // A new player gets a full clock. A player still putting gems back or
   // choosing a noble keeps theirs, but gets at least a short grace period.
   clockAfterMove(prevTurn) {
@@ -215,7 +231,8 @@ export class HostRoom extends Emitter {
 
   checkClock() {
     const r = this.record;
-    if (r.status !== 'playing' || !r.game || !this.deadline || Date.now() < this.deadline) return;
+    if (r.status !== 'playing' || !r.game || !this.deadline) return;
+    if (Date.now() < this.deadline) { this.persist(); return; }
     const prevTurn = r.game.turn;
     const out = applyTimeout(r.game);
     if (!out.ok) { this.deadline = null; return; }
@@ -500,6 +517,10 @@ export class HostRoom extends Emitter {
   }
 
   persist() {
+    const r = this.record;
+    r.clock = r.status === 'playing' && r.game && this.deadline
+      ? { version: r.game.version, left: this.deadline - Date.now() }
+      : null;
     saveHostRecord(this.storage, this.room.id, this.record);
   }
 
