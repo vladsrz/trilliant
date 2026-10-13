@@ -14,6 +14,7 @@
 import { Bus } from './bus.js';
 import { fingerprint, pairKey, sealText, openText, randomId } from './crypto.js';
 import { newGame, applyAction, applyTimeout, viewFor, MAX_PLAYERS, MIN_PLAYERS, isValidTarget, WIN_POINTS } from '../engine.js';
+import { botAction } from '../bot.js';
 import { saveHostRecord } from './identity.js';
 import { every } from './ticker.js';
 
@@ -29,6 +30,9 @@ export const NAME_MAX = 20;
 export const TIMER_CHOICES = [180, 120, 60, 0];
 const DEFAULT_TURN_SECONDS = 180;
 const GRACE_MS = 30000;
+// A bot waits a beat before it moves, so people can follow what it did.
+const BOT_THINK_MS = 900;
+const BOT_NAMES = ['Opal', 'Jasper', 'Garnet', 'Beryl', 'Topaz', 'Agate'];
 export const CHAT_MAX = 240;
 
 export function cleanName(name) {
@@ -122,6 +126,7 @@ export class HostRoom extends Emitter {
     this.bus.start();
     this.stopTicks = every(HEARTBEAT_MS, () => this.tick());
     this.stopClock = every(1000, () => this.checkClock());
+    this.stopBots = every(1000, () => this.playBots());
     // The clock doesn't run while the host is away: a reopened game gives the
     // current player a fresh turn instead of skipping them on the spot.
     this.restartClock();
@@ -130,6 +135,7 @@ export class HostRoom extends Emitter {
   stop() {
     this.stopTicks?.();
     this.stopClock?.();
+    this.stopBots?.();
     this.bus.send('bye', {}).catch(() => {});
     setTimeout(() => this.bus.stop(), 150);
   }
@@ -138,8 +144,10 @@ export class HostRoom extends Emitter {
 
   // ----- presence -----
 
+  isBot(id) { return !!this.record.seats.find((s) => s.id === id)?.bot; }
+
   isOnline(id) {
-    if (id === this.record.hostId) return true;
+    if (id === this.record.hostId || this.isBot(id)) return true;
     const c = this.clients.get(id);
     return !!c && Date.now() - c.lastSeen < ONLINE_MS;
   }
@@ -151,7 +159,7 @@ export class HostRoom extends Emitter {
       max: MAX_PLAYERS,
       turnSeconds: this.turnSeconds,
       target: this.target,
-      seats: r.seats.map((s) => ({ id: s.id, name: s.name, host: s.id === r.hostId, online: this.isOnline(s.id) })),
+      seats: r.seats.map((s) => ({ id: s.id, name: s.name, host: s.id === r.hostId, online: this.isOnline(s.id), bot: !!s.bot })),
     };
   }
 
@@ -388,8 +396,49 @@ export class HostRoom extends Emitter {
     const seat = r.seats.find((s) => s.id === id);
     if (!seat) return;
     r.seats = r.seats.filter((s) => s.id !== id);
-    r.blocked.push(id);
-    this.chatSystem(`${seat.name} was removed from the table.`);
+    if (!seat.bot) {
+      r.blocked.push(id);
+      this.chatSystem(`${seat.name} was removed from the table.`);
+    }
+    this.bump();
+  }
+
+  // ----- bots -----
+
+  // A bot is a seat the host plays. Its id has a colon in it, which a real
+  // player's id (the fingerprint of their key) never does, so nobody can knock
+  // as a bot or move for one.
+  addBot() {
+    const r = this.record;
+    if (r.status !== 'lobby') return { ok: false, error: 'Add bots before the game starts.' };
+    if (r.seats.length >= MAX_PLAYERS) return { ok: false, error: 'The game is full.' };
+    const taken = new Set(r.seats.map((s) => s.name));
+    const free = BOT_NAMES.filter((n) => !taken.has(n));
+    const name = free[Math.floor(Math.random() * free.length)] || 'Bot';
+    r.seats.push({ id: `bot:${randomId(6)}`, name, bot: true });
+    this.bump();
+    return { ok: true };
+  }
+
+  // Plays the seat whose turn it is when that seat is a bot. The bot decides
+  // from the same view a guest in its seat would be sent, and its move goes
+  // through `process` like anyone else's.
+  playBots(now = Date.now()) {
+    const r = this.record;
+    const g = r.status === 'playing' ? r.game : null;
+    const id = g && g.players[g.turn].id;
+    if (!g || !this.isBot(id)) { this.botMove = null; return; }
+    if (this.botMove?.version !== g.version) { this.botMove = { version: g.version, at: now + BOT_THINK_MS }; return; }
+    if (now < this.botMove.at) return;
+    let res;
+    try { res = this.process(id, { action: botAction(viewFor(g, id), g.turn) }); } catch { res = { ok: false }; }
+    if (res.ok) { this.bump(); return; }
+    // A bot must never hold the game up: if its move didn't go through, skip the turn.
+    const out = applyTimeout(g);
+    if (!out.ok) return;
+    r.game = out.state;
+    if (r.game.phase === 'over') this.finishGame();
+    this.clockAfterMove(g.turn);
     this.bump();
   }
 
@@ -420,6 +469,7 @@ export class HostRoom extends Emitter {
     this.emit();
     for (const [id] of this.clients) if (this.isOnline(id)) this.sendSync(id);
     this.announce();
+    this.playBots();
   }
 
   persist() {

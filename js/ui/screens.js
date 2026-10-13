@@ -69,21 +69,21 @@ function ago(ts) {
 // ======================================================================
 
 export function Home({ name, onName, onCreate, tables, onResume, onForget, busy }) {
-  const [confirm, setConfirm] = useState(false);
+  const [confirm, setConfirm] = useState(null);
   const hosted = tables.find((t) => t.role === 'host');
   // One hosted game per browser: a new one ends the old, so ask first if friends were in it.
-  const submit = (e) => {
-    e.preventDefault();
-    if (hosted && hosted.players > 0) setConfirm(true);
-    else onCreate(hosted);
+  const create = (bots) => {
+    if (hosted && hosted.players > 0) setConfirm({ bots });
+    else onCreate(hosted, bots);
   };
+  const submit = (e) => { e.preventDefault(); create(0); };
   return html`<main class="home">
     <div class="home__inner">
       <div class="home__gems" aria-hidden="true">
         ${['white', 'blue', 'green', 'red', 'black', 'gold'].map((c) => html`<${Gem} color=${c} />`)}
       </div>
       <h1 class="home__mark">Trilliant</h1>
-      <p class="home__lede">Trade gems, buy cards, win nobles. Create a game and send the link to a friend.</p>
+      <p class="home__lede">Trade gems, buy cards, win nobles. Create a game and send the link to a friend, or play against bots.</p>
       <form class="panel home__form" onSubmit=${submit}>
         <div>
           <label class="label" for="name">Your name</label>
@@ -93,6 +93,7 @@ export function Home({ name, onName, onCreate, tables, onResume, onForget, busy 
             <button class="btn btn--primary" type="submit" disabled=${busy}>${busy ? 'Creating…' : 'Create game'}</button>
           </div>
         </div>
+        <button class="btn" type="button" disabled=${busy} onClick=${() => create(1)}>Play against bots</button>
         ${tables.length ? html`<div class="tables">
           <h2 class="tables__title">Pick up where you left off</h2>
           ${[...tables].sort((a, b) => (a.role === b.role ? 0 : a.role === 'host' ? -1 : 1)).map((t) => html`<div class="tables__row">
@@ -112,8 +113,8 @@ export function Home({ name, onName, onCreate, tables, onResume, onForget, busy 
         <h2 class="sheet__title" id="replace-title">You already have a game going</h2>
         <p class="sheet__sub">You can host one game at a time. Starting a new one ends ${hosted.title ? hosted.title.replace(/^Your game/, 'your game') : 'your current game'}, and nobody can continue it.</p>
         <div class="sheet__actions">
-          <button type="button" class="btn" onClick=${() => setConfirm(false)}>Keep it</button>
-          <button type="button" class="btn btn--danger-solid" onClick=${() => { setConfirm(false); onCreate(hosted); }}>End it and start new</button>
+          <button type="button" class="btn" onClick=${() => setConfirm(null)}>Keep it</button>
+          <button type="button" class="btn btn--danger-solid" onClick=${() => { setConfirm(null); onCreate(hosted, confirm.bots); }}>End it and start new</button>
         </div>
       </section>
     </div>` : null}
@@ -192,6 +193,7 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
           return html`<li class="player">
             <${Avatar} name=${s.name} me=${mine} off=${!s.online} />
             <span class="player__name">${s.name}${mine ? html` <span class="seat__you">(you)</span>` : null}</span>
+            ${s.bot ? html`<span class="seat__tag">Bot</span>` : null}
             ${mine ? html`<button type="button" class="icon-btn" title="Change name" aria-label="Change name" onClick=${() => setEditing(true)}>${PencilIcon}</button>` : null}
             <span class="player__meta">
               ${!s.online ? html`<span class="seat__off">offline</span>` : null}
@@ -200,7 +202,10 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
             ${isHost && !s.host ? html`<button type="button" class="icon-btn" title=${`Remove ${s.name}`} aria-label=${`Remove ${s.name}`} onClick=${() => room.removeSeat(s.id)}>${CrossIcon}</button>` : null}
           </li>`;
         })}
-        ${open > 0 ? html`<li class="player player--empty"><span class="avatar avatar--empty" aria-hidden="true"></span>${canStart ? `Room for ${open} more` : 'Waiting for players…'}</li>` : null}
+        ${open > 0 ? html`<li class="player player--empty">
+          <span class="avatar avatar--empty" aria-hidden="true"></span>${canStart ? `Space for ${open} more` : 'Waiting for players…'}
+          ${isHost ? html`<span class="player__meta"><button type="button" class="btn btn--small" onClick=${() => room.addBot()}>Add bot</button></span>` : null}
+        </li>` : null}
       </ul>
 
       <div class="settings">
@@ -356,7 +361,7 @@ export function Game({ snap, room, onLeave, notify }) {
 
   const opponents = [];
   for (let k = 1; k < g.players.length; k++) opponents.push((you + k) % g.players.length);
-  const onlineOf = (id) => snap.lobby?.seats.find((s) => s.id === id)?.online ?? false;
+  const seatOf = (id) => snap.lobby?.seats.find((s) => s.id === id);
 
   return html`<div class="game">
     <header class="topbar">
@@ -433,7 +438,7 @@ export function Game({ snap, room, onLeave, notify }) {
     <aside class="side">
       <div class="opps">
         ${opponents.map((i) => html`<${SeatCard} player=${g.players[i]} view=${g}
-          online=${onlineOf(g.players[i].id)} isTurn=${g.turn === i && !over} flash=${fx.seats.has(i)} />`)}
+          online=${seatOf(g.players[i].id)?.online ?? false} bot=${!!seatOf(g.players[i].id)?.bot} isTurn=${g.turn === i && !over} flash=${fx.seats.has(i)} />`)}
       </div>
       <${Feed} g=${g} chat=${snap.chat} you=${you} selfId=${snap.selfId}
         onSend=${(text) => room.act({ type: 'chat', text }).then((r) => { if (!r.ok) notify(r.error); return r; })} />

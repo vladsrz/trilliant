@@ -1,6 +1,6 @@
 # Trilliant
 
-Online gem-trading card game for 2–4 players, played by the rules of Splendor. Create a game, send the link, play in the browser. No accounts, no server to run.
+Online gem-trading card game for 2–4 players, played by the rules of Splendor. Play against bots, invite friends, or mix both in the browser. No accounts, no server to run.
 
 **Play:** https://vladsrz.github.io/trilliant/
 
@@ -10,11 +10,13 @@ Fan-made. Not affiliated with Space Cowboys or Asmodee. No art or text from the 
 
 ## Playing
 
-1. Open the site, pick a name, **Create game**.
-2. **Copy invite link** and send it. Whoever opens it gets a seat (2–4 players).
+1. Open the site and pick a name. Choose **Play against bots** for a solo game with one bot, or **Create game** to invite friends.
+2. In the lobby, the host can add or remove bots until there are 2–4 players total. **Copy invite link** to bring friends into any open seats.
 3. The host presses **Start game**.
 
 The host's browser runs the game, so the host keeps that tab open. If it closes, the game pauses; the host reopens it from the start page (same browser) and everyone reconnects. Other players can close the tab and reopen the link any time without losing their seat. **Leave** in the lobby gives your seat up.
+
+Bots are controlled by the host's browser. They take their turns automatically, including when playing offline against bots alone. They keep their seats and win counts if the host reloads or plays again.
 
 **Game settings** (host, in the lobby): **Points to win** anywhere from 15 (default) to 30 on a slider, and a **Turn timer** of Slow 3 min (default), Normal 2 min, Fast 1 min or Off, like geminist's speeds.
 
@@ -27,7 +29,7 @@ After a game the host can **Play again**; the lobby and results keep a running w
 ## How it works
 
 - **Rules engine** (`js/engine.js`): pure functions over plain JSON. Validates every move, enforces the 10-gem cap, nobles, last round and the fewer-cards tiebreak. `applyTimeout` ends a turn when the clock runs out. Produces a per-player view that never contains deck order or another player's blind reserves.
-- **Host-authoritative games** (`js/net/room.js`): the host seats players, applies moves, saves the game to `localStorage`, and sends each player their own view. Guests only send moves; the host re-checks each one.
+- **Host-authoritative games** (`js/net/room.js`): the host seats players and bots, applies moves, saves the game to `localStorage`, and sends each player their own view. Guests only send moves; the host re-checks each one. Bots choose from their own filtered view, and their moves pass through the same rules checks.
 - **Transport** (`js/net/mqtt.js`, `js/net/bus.js`): every message goes out on three free public MQTT relays at once (EMQX, HiveMQ, Mosquitto) over secure WebSockets; receivers drop duplicates. One relay being down or blocked doesn't matter.
 - **Encryption** (`js/net/crypto.js`): the invite link's `#fragment` holds a 128-bit room secret that never reaches any server. It derives the relay topic and an AES-GCM key that seals every message, so relays only see ciphertext. Each browser also has an ECDH key pair; its fingerprint is the player's id and host↔player traffic is sealed again with a pairwise key, so players can't read each other's private view or forge each other's moves.
 - **UI** (`js/ui/`): Preact + htm, vendored (13 kB), no build step.

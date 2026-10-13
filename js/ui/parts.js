@@ -133,12 +133,13 @@ export function Reserved({ player, isYou, onPick, selectedId, canAfford, size })
   return html`<div class="reserved">${slots}</div>`;
 }
 
-export function SeatCard({ player, view, online, isTurn, flash }) {
+export function SeatCard({ player, view, online, bot, isTurn, flash }) {
   const pts = pointsOf(player);
   const held = tokenTotal(player.tokens);
   return html`<section class=${cls('panel', 'seatcard', 'opp', isTurn && 'is-turn', flash && 'is-flash')} aria-label=${`${player.name}, ${plural(pts, 'point')}`}>
     <div class="seatcard__head">
       <span class="seatcard__name">${player.name}</span>
+      ${bot ? html`<span class="seat__tag">Bot</span>` : null}
       ${!online ? html`<span class="seat__off">offline</span>` : null}
       ${isTurn ? html`<span class="seatcard__turn">Their turn</span>` : null}
       <span class="seatcard__score"><b>${pts}</b><span>/ ${view.target || WIN_POINTS}</span></span>

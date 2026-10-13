@@ -80,6 +80,10 @@ function App() {
 
 // ======================================================================
 
+// "Play against bots" on the start page: the game it just created, and how many
+// bots to seat once its lobby opens.
+let seedBots = null;
+
 function HomeScreen({ notify }) {
   const [name, setName] = useState(defaultName);
   const [tables, setTables] = useState(() => { sweepStorage(storage); return listTables(storage); });
@@ -87,7 +91,7 @@ function HomeScreen({ notify }) {
 
   const onName = (v) => { setName(v); if (v.trim()) saveName(storage, cleanName(v)); };
   // `replacing` is the game this browser already hosts: creating a new one ends it.
-  const onCreate = async (replacing) => {
+  const onCreate = async (replacing, bots = 0) => {
     setBusy(true);
     try {
       if (replacing) forgetTable(storage, replacing.roomId);
@@ -95,6 +99,7 @@ function HomeScreen({ notify }) {
       const secret = newRoomSecret();
       const room = await roomFromSecret(secret);
       const { identity } = await resolveIdentity(storage, room.id);
+      seedBots = bots ? { secret, bots } : null;
       location.hash = `${secret}.${identity.id}`;
     } catch {
       notify('Couldn’t create a game in this browser.');
@@ -144,18 +149,23 @@ function RoomScreen({ secret, hostId, notify }) {
         setSnap(s);
         // Keep "Your games" on the start page labelled with who is playing.
         const seats = s.lobby?.seats || [];
-        const others = seats.filter((x) => x.id !== s.selfId).map((x) => x.name);
+        const others = seats.filter((x) => x.id !== s.selfId);
+        const friends = others.filter((x) => !x.bot).map((x) => x.name);
         const hostName = seats.find((x) => x.host)?.name;
         const title = s.role === 'host'
-          ? (others.length ? `Your game with ${others.join(', ')}` : 'Your game')
+          ? (friends.length ? `Your game with ${friends.join(', ')}` : others.length ? 'Your game against bots' : 'Your game')
           : (hostName ? `${hostName}’s game` : '');
         if (title !== titleKey) {
           titleKey = title;
-          rememberTable(storage, { roomId: r.id, secret, hostId, role: room.role, title, players: others.length });
+          rememberTable(storage, { roomId: r.id, secret, hostId, role: room.role, title, players: friends.length });
         }
       };
       unsub = room.subscribe(refresh);
       room.start();
+      if (room.role === 'host' && seedBots?.secret === secret) {
+        for (let i = 0; i < seedBots.bots; i++) room.addBot();
+        seedBots = null;
+      }
       refresh();
       setPhase('ready');
     })();
@@ -230,15 +240,18 @@ function RoomScreen({ secret, hostId, notify }) {
   }
 
   const hostName = lobby?.seats.find((s) => s.host)?.name || 'The host';
+  // A game against bots alone never leaves this browser, so it plays on without the relays.
+  const alone = snap.role === 'host' && !!lobby?.seats.every((s) => s.id === snap.selfId || s.bot);
+  const offline = snap.link && !snap.link.up && snap.synced && !(alone && lobby.seats.length > 1);
   return html`
     ${screen}
     ${snap.role === 'guest' && snap.synced && !snap.hostOnline ? html`<div class="banner" role="status">${hostName} is offline. The game continues when they’re back.</div>` : null}
-    ${snap.link && !snap.link.up && snap.synced ? html`<div class="banner" role="status">Connection lost. Reconnecting…</div>` : null}
+    ${offline ? html`<div class="banner" role="status">Connection lost. Reconnecting…</div>` : null}
     ${confirmLeave ? html`<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="leave-title">
       <section class="panel sheet notice">
         <h2 class="sheet__title" id="leave-title">Leave the game?</h2>
         <p class="sheet__sub">${snap.role === 'host'
-          ? 'Everyone waits until you come back. You can reopen it from “Your games” on the start page.'
+          ? alone ? 'The game pauses until you come back. You can reopen it from the start page.' : 'Everyone waits until you come back. You can reopen it from “Your games” on the start page.'
           : lobby?.status === 'lobby'
             ? 'You’ll give up your seat. The same link lets you rejoin.'
             : 'The game waits for you. Open the same link to jump back in.'}</p>
