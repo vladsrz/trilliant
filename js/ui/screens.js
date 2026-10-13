@@ -75,9 +75,9 @@ function ago(ts) {
 export function Home({ name, onName, onCreate, tables, onResume, onForget, busy }) {
   const [confirm, setConfirm] = useState(null);
   const hosted = tables.find((t) => t.role === 'host');
-  // One hosted game per browser: a new one ends the old, so ask first if friends were in it.
+  // One hosted game per browser: a new one ends the old, so always ask first.
   const create = (bots) => {
-    if (hosted && hosted.players > 0) setConfirm({ bots });
+    if (hosted) setConfirm({ bots });
     else onCreate(hosted, bots);
   };
   const submit = (e) => { e.preventDefault(); create(0); };
