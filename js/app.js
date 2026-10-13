@@ -4,7 +4,7 @@ import { Home, Lobby, Game, Notice, Connecting } from './ui/screens.js';
 import { roomFromSecret, newRoomSecret } from './net/crypto.js';
 import { HostRoom, GuestRoom, cleanName } from './net/room.js';
 import {
-  browserStorage, resolveIdentity, holdIdentity, loadHostRecord, listTables, rememberTable, forgetTable, sweepStorage, loadName, saveName,
+  browserStorage, resolveIdentity, holdIdentity, loadHostRecord, listTables, rememberTable, forgetTable, unrememberTable, sweepStorage, loadName, saveName,
 } from './net/identity.js';
 
 const storage = browserStorage();
@@ -116,7 +116,7 @@ function HomeScreen({ notify }) {
 // ======================================================================
 
 function RoomScreen({ secret, hostId, notify }) {
-  const [phase, setPhase] = useState('connecting'); // connecting | conflict | ready | broken
+  const [phase, setPhase] = useState('connecting'); // connecting | conflict | ready | broken | expired
   const [snap, setSnap] = useState(null);
   const [forceNew, setForceNew] = useState(false);
   const [waited, setWaited] = useState(false);
@@ -134,6 +134,7 @@ function RoomScreen({ secret, hostId, notify }) {
     (async () => {
       let r;
       try { r = await roomFromSecret(secret); } catch { setPhase('broken'); return; }
+      if (loadHostRecord(storage, r.id)?.status === 'expired') { setPhase('expired'); return; }
       const res = await resolveIdentity(storage, r.id, { forceNew });
       if (dead) return;
       if (res.conflict) { setPhase('conflict'); return; }
@@ -147,6 +148,10 @@ function RoomScreen({ secret, hostId, notify }) {
       const refresh = () => {
         const s = room.snapshot();
         setSnap(s);
+        if (s.lobby?.status === 'expired') {
+          if (s.role === 'guest') unrememberTable(storage, r.id);
+          return;
+        }
         // Keep "Your games" on the start page labelled with who is playing.
         const seats = s.lobby?.seats || [];
         const others = seats.filter((x) => x.id !== s.selfId);
@@ -209,6 +214,10 @@ function RoomScreen({ secret, hostId, notify }) {
     return html`<${Notice} title="That link doesn’t work" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
       It looks damaged. Ask for the link again.</${Notice}>`;
   }
+  if (phase === 'expired') {
+    return html`<${Notice} title="This lobby expired" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
+      Lobbies close after one hour without activity. Create a new game to keep playing.</${Notice}>`;
+  }
   if (phase === 'conflict') {
     return html`<${Notice} title="This game is open in another tab"
       actions=${html`<button class="btn" onClick=${goHome}>Back to start</button>
@@ -221,6 +230,9 @@ function RoomScreen({ secret, hostId, notify }) {
   const lobby = snap.lobby;
   if (!snap.synced || !lobby) {
     screen = html`<${Connecting} snap=${snap} waited=${waited} />`;
+  } else if (lobby.status === 'expired') {
+    screen = html`<${Notice} title="This lobby expired" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
+      Lobbies close after one hour without activity. Create a new game to keep playing.</${Notice}>`;
   } else if (snap.seated && snap.game && lobby.status !== 'lobby') {
     screen = html`<${Game} snap=${snap} room=${room} onLeave=${onLeave} notify=${notify} />`;
   } else if (lobby.status === 'lobby' && snap.seated) {
@@ -245,8 +257,8 @@ function RoomScreen({ secret, hostId, notify }) {
   const offline = snap.link && !snap.link.up && snap.synced && !(alone && lobby.seats.length > 1);
   return html`
     ${screen}
-    ${snap.role === 'guest' && snap.synced && !snap.hostOnline ? html`<div class="banner" role="status">${hostName} is offline. The game continues when they’re back.</div>` : null}
-    ${offline ? html`<div class="banner" role="status">Connection lost. Reconnecting…</div>` : null}
+    ${lobby?.status !== 'expired' && snap.role === 'guest' && snap.synced && !snap.hostOnline ? html`<div class="banner" role="status">${hostName} is offline. The game continues when they’re back.</div>` : null}
+    ${lobby?.status !== 'expired' && offline ? html`<div class="banner" role="status">Connection lost. Reconnecting…</div>` : null}
     ${confirmLeave ? html`<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="leave-title">
       <section class="panel sheet notice">
         <h2 class="sheet__title" id="leave-title">Leave the game?</h2>

@@ -4,8 +4,9 @@
 import { CARDS } from '../data.js';
 
 const MOVE_TYPES = new Set(['take', 'reserve', 'buy', 'discard', 'noble', 'timeout']);
-const FLIGHT_MS = 560;
-const GEM_STAGGER_MS = 85;
+const PIECE_FLIGHT_MS = 850;
+const GEM_FLIGHT_MS = 1250;
+const GEM_STAGGER_MS = 320;
 
 export function capturePieces(root) {
   const pieces = new Map();
@@ -67,12 +68,13 @@ function fly(pieces, root, from, to, fallback, delay = 0) {
     { transform: 'translate(0, 0) scale(1)', opacity: 1, offset: 0 },
     { transform: `translate(${dx * 0.48}px, ${dy * 0.48 - 18}px) scale(${(1 + scale) / 2})`, opacity: 1, offset: 0.52 },
     { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.85, offset: 1 },
-  ], { duration: FLIGHT_MS, delay, easing: 'cubic-bezier(.2,.68,.2,1)', fill: 'forwards' });
+  ], { duration: ghost.classList.contains('gem') ? GEM_FLIGHT_MS : PIECE_FLIGHT_MS,
+    delay, easing: 'cubic-bezier(.2,.68,.2,1)', fill: 'forwards' });
   motion.finished.then(() => {
     ghost.remove();
     target.animate([
       { transform: 'scale(1)' }, { transform: 'scale(1.19)' }, { transform: 'scale(1)' },
-    ], { duration: 280, easing: 'ease-out' });
+    ], { duration: 350, easing: 'ease-out' });
   }).catch(() => ghost.remove());
 }
 

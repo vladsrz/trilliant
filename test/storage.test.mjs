@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { testStorage, rememberTable, listTables, hostedTable, forgetTable, sweepStorage, saveHostRecord, resolveIdentity } from '../js/net/identity.js';
+import { testStorage, rememberTable, listTables, hostedTable, forgetTable, sweepStorage, saveHostRecord, resolveIdentity, LOBBY_IDLE_MS } from '../js/net/identity.js';
 
 const seed = (st, roomId, extra = {}) => {
   saveHostRecord(st, roomId, { createdAt: Date.now() - 2 * 3600 * 1000, ...extra });
@@ -51,4 +51,21 @@ test('the sweep clears old unlisted saves but never fresh ones', async () => {
   assert.equal(removed, 4, 'room + id keys of the two old games');
   assert.ok(st.local.getItem('trilliant:room:KEEP'));
   assert.ok(st.local.getItem('trilliant:id:OPENING'), 'a brand-new identity survives');
+});
+
+test('the start page expires a saved idle lobby but keeps a marker for old links', () => {
+  const st = testStorage();
+  const now = Date.now();
+  saveHostRecord(st, 'IDLE', {
+    status: 'lobby', hostId: 'host', seats: [{ id: 'host' }], secret: 'private',
+    game: null, chat: [{ text: 'old' }], rev: 2, createdAt: now - LOBBY_IDLE_MS - 10,
+    lastActivityAt: now - LOBBY_IDLE_MS - 1,
+  });
+  rememberTable(st, { roomId: 'IDLE', role: 'host', title: 'Your game' });
+  sweepStorage(st, now);
+  assert.equal(listTables(st).length, 0);
+  const marker = JSON.parse(st.local.getItem('trilliant:room:IDLE'));
+  assert.equal(marker.status, 'expired');
+  assert.equal(marker.secret, undefined);
+  assert.deepEqual(marker.chat, []);
 });

@@ -16,6 +16,8 @@ Fan-made. Not affiliated with Space Cowboys or Asmodee. No art or text from the 
 
 The host's browser runs the game, so the host keeps that tab open. If it closes, the game pauses; the host reopens it from the start page (same browser) and everyone reconnects. Other players can close the tab and reopen the link any time without losing their seat. **Leave** in the lobby gives your seat up.
 
+A lobby closes after one hour without a join, chat message, or settings change. An in-progress game does not expire. Returning from a completed game to the lobby starts a fresh hour.
+
 Bots are controlled by the host's browser. They take their turns automatically, including when playing offline against bots alone. They keep their seats and win counts if the host reloads or plays again.
 
 Accepted moves animate gems, cards and nobles from the board to the player who receives them (or back to the bank when spent). The speaker button in a game mutes the short sound cues; its setting is saved in this browser. Reduced-motion settings turn off the moving pieces.

@@ -236,7 +236,7 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
           ? html`<button type="button" class="btn btn--primary" disabled=${!canStart} onClick=${() => { const r = room.startGame(); if (!r.ok) notify(r.error); }}>Start game</button>`
           : html`<button type="button" class="btn" disabled>Waiting for ${hostName} to start</button>`}
       </div>
-      ${isHost ? html`<p class="lobby__note">Keep this tab open while you play. Your browser runs the game.</p>` : null}
+      <p class="lobby__note">Lobbies close after one hour without activity.${isHost ? ' Keep this tab open while you play; your browser runs the game.' : ''}</p>
     </section>
   </main>`;
 }

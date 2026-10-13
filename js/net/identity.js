@@ -89,6 +89,26 @@ export function holdIdentity(storage, roomId, id) {
 
 export const loadHostRecord = (storage, roomId) => readJSON(storage.local, `trilliant:room:${roomId}`);
 export const saveHostRecord = (storage, roomId, record) => writeJSON(storage.local, `trilliant:room:${roomId}`, record);
+export const LOBBY_IDLE_MS = 60 * 60 * 1000;
+
+export function lobbyExpired(record, now = Date.now()) {
+  return record?.status === 'lobby' && now - (record.lastActivityAt ?? record.createdAt ?? now) >= LOBBY_IDLE_MS;
+}
+
+// Keep a small marker so an old invite cannot recreate a deleted host game.
+export function expireHostRecord(storage, roomId, record, now = Date.now()) {
+  const marker = {
+    v: 1, status: 'expired', hostId: record.hostId, seats: [], game: null,
+    chat: [], tally: {}, settings: record.settings, rev: (record.rev || 0) + 1,
+    createdAt: record.createdAt, expiredAt: now,
+  };
+  writeJSON(storage.local, 'trilliant:tables', listTables(storage).filter((t) => t.roomId !== roomId));
+  storage.local.removeItem(`trilliant:id:${roomId}`);
+  storage.local.removeItem(`trilliant:live:${roomId}`);
+  storage.session.removeItem(`trilliant:tab:${roomId}`);
+  saveHostRecord(storage, roomId, marker);
+  return marker;
+}
 
 export function listTables(storage) {
   const list = readJSON(storage.local, 'trilliant:tables');
@@ -121,12 +141,21 @@ export function forgetTable(storage, roomId) {
   dropGame(storage, roomId);
 }
 
+export function unrememberTable(storage, roomId) {
+  writeJSON(storage.local, 'trilliant:tables', listTables(storage).filter((t) => t.roomId !== roomId));
+}
+
 // Saved games that aren't on the list any more (older versions kept up to
 // eight). Only runs from the start page, and skips anything touched in the
 // last hour so a game being opened in another tab is never caught.
 export function sweepStorage(storage, now = Date.now()) {
   const store = storage.local;
   if (typeof store.length !== 'number' || typeof store.key !== 'function') return 0;
+  for (const t of listTables(storage)) {
+    if (t.role !== 'host') continue;
+    const record = loadHostRecord(storage, t.roomId);
+    if (lobbyExpired(record, now)) expireHostRecord(storage, t.roomId, record, now);
+  }
   const listed = new Set(listTables(storage).map((t) => t.roomId));
   const doomed = [];
   for (let i = 0; i < store.length; i++) {
@@ -134,6 +163,10 @@ export function sweepStorage(storage, now = Date.now()) {
     const m = /^trilliant:(room|id|live):(.+)$/.exec(key || '');
     if (!m || listed.has(m[2])) continue;
     const rec = readJSON(store, key);
+    if (rec?.status === 'expired') {
+      if (now - rec.expiredAt > 30 * 24 * LOBBY_IDLE_MS) doomed.push(key);
+      continue;
+    }
     const at = rec?.createdAt || rec?.at || 0;
     if (now - at > 3600 * 1000) doomed.push(key);
   }

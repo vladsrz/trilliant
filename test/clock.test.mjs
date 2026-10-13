@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { roomFromSecret, newRoomSecret, createIdentity } from '../js/net/crypto.js';
 import { HostRoom } from '../js/net/room.js';
-import { testStorage } from '../js/net/identity.js';
+import { testStorage, LOBBY_IDLE_MS, loadHostRecord, listTables, rememberTable } from '../js/net/identity.js';
 import { tokenTotal } from '../js/engine.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -109,5 +109,36 @@ test('a reopened game restarts the clock instead of skipping someone at once', a
   host.deadline = Date.now() - 60000; // as if the tab had been closed for a while
   host.start();
   assert.ok(host.deadline - Date.now() > 170000);
+  host.stop();
+});
+
+test('a lobby expires after one hour without changes, even while its tab is open', async () => {
+  const { host } = await table();
+  host.start();
+  rememberTable(host.storage, { roomId: host.room.id, role: 'host', title: 'Your game' });
+  host.record.lastActivityAt = Date.now() - LOBBY_IDLE_MS - 1;
+  host.tick();
+  assert.equal(host.record.status, 'expired');
+  assert.deepEqual(host.record.seats, []);
+  assert.equal(loadHostRecord(host.storage, host.room.id).status, 'expired');
+  assert.equal(listTables(host.storage).length, 0);
+  assert.equal(host.startGame().ok, false);
+  host.stop();
+});
+
+test('lobby changes reset the idle clock; heartbeats and active games do not expire', async () => {
+  const { host } = await table();
+  host.record.lastActivityAt = Date.now() - LOBBY_IDLE_MS + 1000;
+  const before = host.record.lastActivityAt;
+  host.tick();
+  assert.equal(host.record.lastActivityAt, before);
+  host.setTimer(60);
+  assert.ok(host.record.lastActivityAt > before);
+  assert.ok(host.startGame().ok);
+  host.record.lastActivityAt = Date.now() - 2 * LOBBY_IDLE_MS;
+  host.tick();
+  assert.equal(host.record.status, 'playing');
+  host.backToLobby();
+  assert.ok(Date.now() - host.record.lastActivityAt < 1000);
   host.stop();
 });

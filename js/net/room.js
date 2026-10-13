@@ -15,7 +15,7 @@ import { Bus } from './bus.js';
 import { fingerprint, pairKey, sealText, openText, randomId } from './crypto.js';
 import { newGame, applyAction, applyTimeout, viewFor, MAX_PLAYERS, MIN_PLAYERS, isValidTarget, WIN_POINTS } from '../engine.js';
 import { botAction } from '../bot.js';
-import { saveHostRecord } from './identity.js';
+import { saveHostRecord, lobbyExpired, expireHostRecord } from './identity.js';
 import { every } from './ticker.js';
 
 const HEARTBEAT_MS = 3000;
@@ -108,6 +108,7 @@ export class HostRoom extends Emitter {
       settings: { turnSeconds: DEFAULT_TURN_SECONDS, target: WIN_POINTS },
       rev: 1,
       createdAt: Date.now(),
+      lastActivityAt: Date.now(),
     };
     this.deadline = null;
     this.clients = new Map();
@@ -122,6 +123,7 @@ export class HostRoom extends Emitter {
   }
 
   start() {
+    if (this.expireIfIdle() || this.record.status === 'expired') return;
     this.persist();
     this.bus.start();
     this.stopTicks = every(HEARTBEAT_MS, () => this.tick());
@@ -140,7 +142,21 @@ export class HostRoom extends Emitter {
     setTimeout(() => this.bus.stop(), 150);
   }
 
-  wake() { this.bus.wake(); this.announce(); }
+  wake() { if (!this.expireIfIdle()) { this.bus.wake(); this.announce(); } }
+
+  expireIfIdle(now = Date.now()) {
+    if (this.record.status === 'expired') return true;
+    if (!lobbyExpired(this.record, now)) return false;
+    this.record = expireHostRecord(this.storage, this.room.id, this.record, now);
+    this.deadline = null;
+    this.stopTicks?.();
+    this.stopClock?.();
+    this.stopBots?.();
+    this.emit();
+    for (const [id] of this.clients) this.sendSync(id);
+    this.announce();
+    return true;
+  }
 
   // ----- presence -----
 
@@ -171,6 +187,7 @@ export class HostRoom extends Emitter {
   }
 
   setTarget(points) {
+    if (this.expireIfIdle()) return;
     const r = this.record;
     if (r.status === 'playing' || !isValidTarget(points) || points === this.target) return;
     r.settings = { ...(r.settings || {}), target: points };
@@ -214,6 +231,7 @@ export class HostRoom extends Emitter {
   }
 
   setTimer(seconds) {
+    if (this.expireIfIdle()) return;
     const r = this.record;
     if (r.status === 'playing' || !TIMER_CHOICES.includes(seconds) || seconds === this.turnSeconds) return;
     r.settings = { ...(r.settings || {}), turnSeconds: seconds };
@@ -221,6 +239,7 @@ export class HostRoom extends Emitter {
   }
 
   tick() {
+    if (this.expireIfIdle()) return;
     this.announce();
     for (const [id, c] of this.clients) {
       if (this.isOnline(id) && c.rev < this.record.rev) this.sendSync(id);
@@ -236,6 +255,7 @@ export class HostRoom extends Emitter {
   // ----- inbound -----
 
   async onMessage(env) {
+    this.expireIfIdle();
     if (env.t === 'knock') {
       if (Date.now() - (this.lastKnock || 0) > 800) { this.lastKnock = Date.now(); this.announce(); }
       return;
@@ -331,6 +351,7 @@ export class HostRoom extends Emitter {
   // One move from one seat. Guests pass `base` (the game version they saw) so a
   // move made against a stale table is refused instead of misapplied.
   process(playerId, { base, action }) {
+    if (this.expireIfIdle()) return { ok: false, error: 'This lobby expired.' };
     const r = this.record;
     if (!action || typeof action !== 'object') return { ok: false, error: 'Unknown move.' };
     const seated = r.seats.some((s) => s.id === playerId);
@@ -371,6 +392,7 @@ export class HostRoom extends Emitter {
   }
 
   startGame() {
+    if (this.expireIfIdle()) return { ok: false, error: 'This lobby expired.' };
     const r = this.record;
     if (r.status === 'playing') return { ok: false, error: 'A game is already running.' };
     if (r.seats.length < MIN_PLAYERS) return { ok: false, error: 'Waiting for at least one more player.' };
@@ -384,6 +406,7 @@ export class HostRoom extends Emitter {
 
   backToLobby() {
     const r = this.record;
+    if (r.status === 'expired') return;
     r.status = 'lobby';
     r.game = null;
     this.deadline = null;
@@ -391,6 +414,7 @@ export class HostRoom extends Emitter {
   }
 
   removeSeat(id) {
+    if (this.expireIfIdle()) return;
     const r = this.record;
     if (r.status === 'playing' || id === r.hostId) return;
     const seat = r.seats.find((s) => s.id === id);
@@ -409,6 +433,7 @@ export class HostRoom extends Emitter {
   // player's id (the fingerprint of their key) never does, so nobody can knock
   // as a bot or move for one.
   addBot() {
+    if (this.expireIfIdle()) return { ok: false, error: 'This lobby expired.' };
     const r = this.record;
     if (r.status !== 'lobby') return { ok: false, error: 'Add bots before the game starts.' };
     if (r.seats.length >= MAX_PLAYERS) return { ok: false, error: 'The game is full.' };
@@ -443,6 +468,7 @@ export class HostRoom extends Emitter {
   }
 
   setName(name) {
+    if (this.expireIfIdle()) return;
     const r = this.record;
     const clean = cleanName(name);
     const seat = r.seats.find((s) => s.id === r.hostId);
@@ -464,6 +490,7 @@ export class HostRoom extends Emitter {
   chatSystem(text) { this.pushChat({ from: null, name: null, text }); }
 
   bump() {
+    if (this.record.status === 'lobby') this.record.lastActivityAt = Date.now();
     this.record.rev += 1;
     this.persist();
     this.emit();
