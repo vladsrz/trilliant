@@ -200,12 +200,14 @@ button { cursor: pointer; }
 .player .rename .field { flex: 1; min-height: 34px; font-size: 15px; }
 .settings { margin-top: 18px; display: grid; gap: 14px; }
 .settings .setting { margin: 0; }
-.more__toggle { display: inline-flex; align-items: center; gap: 5px; min-height: 24px; font-size: 12px; color: var(--text-faint); cursor: pointer; list-style: none; border-radius: 6px; }
+/* Reads as one more settings row: same label style on the left, a chevron where the controls sit. */
+.more__toggle { display: flex; align-items: center; justify-content: space-between; min-height: 36px; font-size: 14px; color: var(--text-mute); cursor: pointer; list-style: none; border-radius: 6px; }
 .more__toggle::-webkit-details-marker { display: none; }
-.more__toggle::after { content: ''; width: 5px; height: 5px; margin-top: -3px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform 0.15s ease; }
-.more[open] .more__toggle::after { margin-top: 3px; transform: rotate(-135deg); }
-.more__toggle:hover { color: var(--text-mute); }
-.more__body { display: grid; gap: 14px; margin-top: 12px; }
+.more__toggle::after { content: ''; width: 7px; height: 7px; margin: -3px 6px 0 0; border-right: 1.5px solid var(--text-faint); border-bottom: 1.5px solid var(--text-faint); transform: rotate(45deg); transition: transform 0.15s ease; }
+.more[open] .more__toggle::after { margin-top: 4px; transform: rotate(-135deg); }
+.more__toggle:hover { color: var(--text); }
+.more__toggle:hover::after { border-color: var(--text-mute); }
+.more__body { display: grid; gap: 14px; margin-top: 8px; }
 .setting__hint { display: block; font-size: 12px; color: var(--text-faint); margin-top: 2px; }
 .lobby__actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 24px; }
 .lobby__note { margin: 14px 0 0; font-size: 12.5px; color: var(--text-faint); }
