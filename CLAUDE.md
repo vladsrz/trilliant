@@ -5,7 +5,7 @@ Online Splendor-rules game. Static site, no build, no server. Read `README.md` f
 ## Invariants — don't break these
 - `js/engine.js` stays pure (no DOM, no network, no `Date.now()` in rules). Every rule change gets a test in `test/engine.test.mjs`; the simulation test must keep passing.
 - The host is the only authority. Guests send intents; `HostRoom.process` → `applyAction` validates everything. Never apply a guest-supplied state.
-- `viewFor` is the only thing that leaves the host. It must never include deck order, the RNG, or another player's blind reserves. With the host's "Reserved cards: Hidden" setting (the default; `hideReserves` in the game state) it also strips cards reserved from the board, in the seat and in the log, leaving only the level.
+- `viewFor` is the only thing that leaves the host. It must never include deck order, the RNG, or another player's blind reserves. It also strips cards an opponent reserved from the board, in the seat and in the log, leaving only the level (the rulebook keeps reserved cards in hand). The host always starts games with `hideReserves` on; it is not a lobby setting.
 - Shuffles use `secureRandom` (CSPRNG). A seeded RNG is for tests only; a 32-bit seed can be brute-forced from the visible board.
 - Messages that change a seat or make a move are pair-sealed (`hi`, `act`). Only presence (`host`, `knock`, `bye`) rides on the room key alone.
 - Changing `RELAYS` in `js/net/bus.js` means updating `connect-src` in the CSP in `index.html`, or the browser will block the new relay.

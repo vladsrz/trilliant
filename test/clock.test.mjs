@@ -103,15 +103,11 @@ test('hints are off by default and only the host changes them, in the lobby', as
   host.stop();
 });
 
-test('reserved cards are hidden by default and the host can open them, in the lobby', async () => {
+test('every game the host starts keeps reserved cards hidden from opponents', async () => {
   const { host } = await table();
-  assert.equal(host.lobbyPublic().hideReserves, true);
-  host.setHideReserves(false);
-  assert.equal(host.lobbyPublic().hideReserves, false);
+  assert.equal('hideReserves' in host.lobbyPublic(), false, 'not a setting');
   assert.ok(host.startGame().ok);
-  assert.equal(host.record.game.hideReserves, false);
-  host.setHideReserves(true);
-  assert.equal(host.hideReserves, false, 'no changes mid-game');
+  assert.equal(host.record.game.hideReserves, true);
   host.stop();
 });
 

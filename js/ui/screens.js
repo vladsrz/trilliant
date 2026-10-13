@@ -240,15 +240,6 @@ export function Lobby({ snap, room, name, onRename, onLeave, notify }) {
               </div>`
             : html`<span class="setting__value">${lobby.hints ? 'On' : 'Off'}</span>`}
         </div>
-        <div class="setting">
-          <span class="setting__label">Reserved cards<span class="setting__hint">${lobby.hideReserves ? 'Opponents see only the level of a card you reserve' : 'Everyone sees cards reserved from the board'}</span></span>
-          ${isHost
-            ? html`<div class="segmented" role="radiogroup" aria-label="Reserved cards">
-                ${[[true, 'Hidden'], [false, 'Shown']].map(([on, label]) => html`<button type="button" role="radio" aria-checked=${String(!!lobby.hideReserves === on)}
-                  class=${cls(!!lobby.hideReserves === on && 'is-on')} onClick=${() => room.setHideReserves(on)}>${label}</button>`)}
-              </div>`
-            : html`<span class="setting__value">${lobby.hideReserves ? 'Hidden' : 'Shown'}</span>`}
-        </div>
           </div>
         </details>
       </div>
