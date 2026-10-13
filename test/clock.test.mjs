@@ -103,6 +103,18 @@ test('hints are off by default and only the host changes them, in the lobby', as
   host.stop();
 });
 
+test('reserved cards are hidden by default and the host can open them, in the lobby', async () => {
+  const { host } = await table();
+  assert.equal(host.lobbyPublic().hideReserves, true);
+  host.setHideReserves(false);
+  assert.equal(host.lobbyPublic().hideReserves, false);
+  assert.ok(host.startGame().ok);
+  assert.equal(host.record.game.hideReserves, false);
+  host.setHideReserves(true);
+  assert.equal(host.hideReserves, false, 'no changes mid-game');
+  host.stop();
+});
+
 test('timer off means no clock and no timeouts', async () => {
   const { host } = await table();
   host.setTimer(0);

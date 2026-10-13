@@ -179,7 +179,7 @@ export function LogItem({ e, players, you, target = WIN_POINTS, tag = 'li' }) {
     case 'start': key = true; body = html`${W} ${e.p === you ? 'go' : 'goes'} first.`; break;
     case 'take': body = html`${W} took <${GemList} gems=${e.gems} />`; break;
     case 'reserve': {
-      const what = e.card === null || e.card === undefined ? `a face-down level ${ROMAN[e.level]} card` : describeCard(e.card);
+      const what = e.card === null || e.card === undefined ? `a ${e.blind ? 'face-down ' : ''}level ${ROMAN[e.level]} card` : describeCard(e.card);
       body = html`${W} reserved ${what}${e.blind && e.card != null ? ' from the deck' : ''}${e.gold ? html` and took <${Gem} color="gold" title="gold" />` : ''}`;
       break;
     }

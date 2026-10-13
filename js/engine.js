@@ -127,7 +127,7 @@ export function deckCounts(state) {
 
 // ---------- setup ----------
 
-export function newGame(seats, { rand = secureRandom, target = WIN_POINTS } = {}) {
+export function newGame(seats, { rand = secureRandom, target = WIN_POINTS, hideReserves = false } = {}) {
   if (!isValidTarget(target)) throw new Error(`Target must be a whole number from ${MIN_TARGET} to ${MAX_TARGET}`);
   const n = seats.length;
   if (n < MIN_PLAYERS || n > MAX_PLAYERS) throw new Error(`Needs ${MIN_PLAYERS}-${MAX_PLAYERS} players`);
@@ -155,6 +155,7 @@ export function newGame(seats, { rand = secureRandom, target = WIN_POINTS } = {}
     start,
     turn: start,
     target,
+    hideReserves: !!hideReserves,
     round: 1,
     phase: 'play', // play | discard | noble | over
     pending: null,
@@ -450,7 +451,9 @@ export function hasMainAction(s, pi) {
 // ---------- views ----------
 
 // What one seat is allowed to know. Deck order never leaves the host, and a
-// blind-reserved card is visible only to the player holding it.
+// blind-reserved card is visible only to the player holding it. With
+// hideReserves on, the same goes for a card reserved from the board: others
+// keep only its level, in the seat and in the log.
 export function viewFor(s, viewerId) {
   const you = s.players.findIndex((p) => p.id === viewerId);
   return {
@@ -471,7 +474,7 @@ export function viewFor(s, viewerId) {
       cards: [...p.cards],
       nobles: [...p.nobles],
       reserved: p.reserved.map((r) =>
-        i === you || !r.blind
+        i === you || (!r.blind && !s.hideReserves)
           ? { id: r.id, blind: r.blind, level: CARDS[r.id].level }
           : { id: null, blind: true, level: CARDS[r.id].level }),
     })),
@@ -479,7 +482,7 @@ export function viewFor(s, viewerId) {
     board: { 1: [...s.board[1]], 2: [...s.board[2]], 3: [...s.board[3]] },
     deckCounts: deckCounts(s),
     nobles: [...s.nobles],
-    log: s.log.slice(-80).map((e) => (e.t === 'reserve' && e.blind && e.p !== you ? { ...e, card: null } : e)),
+    log: s.log.slice(-80).map((e) => (e.t === 'reserve' && (e.blind || s.hideReserves) && e.p !== you ? { ...e, card: null } : e)),
     result: s.result,
   };
 }

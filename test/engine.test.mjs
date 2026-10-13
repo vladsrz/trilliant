@@ -426,3 +426,28 @@ test('legal move generator agrees with the engine', () => {
     }
   }
 });
+
+test('with hidden reserves, others see only the level of a card reserved from the board', () => {
+  let s = newGame([{ id: 'p0', name: 'A' }, { id: 'p1', name: 'B' }], { rand: seededRandom(7), hideReserves: true });
+  const pi = s.turn;
+  const me = s.players[pi].id;
+  const other = s.players[1 - pi].id;
+  const card = s.board[2][0];
+  const out = applyAction(s, me, { type: 'reserve', card });
+  assert.ok(out.ok, out.error);
+  s = out.state;
+  const mine = viewFor(s, me);
+  const theirs = viewFor(s, other);
+  assert.equal(mine.players[pi].reserved[0].id, card);
+  assert.deepEqual(theirs.players[pi].reserved[0], { id: null, blind: true, level: 2 });
+  assert.equal(mine.log.at(-1).card, card);
+  assert.equal(theirs.log.at(-1).card, null);
+  assert.ok(!JSON.stringify(theirs.players[pi]).includes(`"id":${card}`), 'the card id never reaches the other seat');
+
+  // Open reserves, the printed rule, stay the default for the engine.
+  let open = newGame([{ id: 'p0', name: 'A' }, { id: 'p1', name: 'B' }], { rand: seededRandom(7) });
+  const who = open.players[open.turn].id;
+  const seen = open.board[2][0];
+  open = applyAction(open, who, { type: 'reserve', card: seen }).state;
+  assert.equal(viewFor(open, open.players.find((p) => p.id !== who).id).players.find((p) => p.id === who).reserved[0].id, seen);
+});

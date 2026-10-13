@@ -105,7 +105,7 @@ export class HostRoom extends Emitter {
       game: null,
       chat: [],
       tally: {},
-      settings: { turnSeconds: DEFAULT_TURN_SECONDS, target: WIN_POINTS, hints: false },
+      settings: { turnSeconds: DEFAULT_TURN_SECONDS, target: WIN_POINTS, hints: false, hideReserves: true },
       rev: 1,
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
@@ -177,6 +177,7 @@ export class HostRoom extends Emitter {
       turnSeconds: this.turnSeconds,
       target: this.target,
       hints: this.hints,
+      hideReserves: this.hideReserves,
       seats: r.seats.map((s) => ({ id: s.id, name: s.name, host: s.id === r.hostId, online: this.isOnline(s.id), bot: !!s.bot })),
     };
   }
@@ -205,6 +206,18 @@ export class HostRoom extends Emitter {
     const r = this.record;
     if (r.status === 'playing' || typeof on !== 'boolean' || on === this.hints) return;
     r.settings = { ...(r.settings || {}), hints: on };
+    this.bump();
+  }
+
+  // Opponents see only the level of a card someone reserved, unless the host
+  // chooses open reserves (the printed rule for cards taken from the board).
+  get hideReserves() { return this.record.settings?.hideReserves !== false; }
+
+  setHideReserves(on) {
+    if (this.expireIfIdle()) return;
+    const r = this.record;
+    if (r.status === 'playing' || typeof on !== 'boolean' || on === this.hideReserves) return;
+    r.settings = { ...(r.settings || {}), hideReserves: on };
     this.bump();
   }
 
@@ -426,7 +439,7 @@ export class HostRoom extends Emitter {
     const r = this.record;
     if (r.status === 'playing') return { ok: false, error: 'A game is already running.' };
     if (r.seats.length < MIN_PLAYERS) return { ok: false, error: 'Waiting for at least one more player.' };
-    r.game = newGame(r.seats.map((s) => ({ id: s.id, name: s.name })), { target: this.target });
+    r.game = newGame(r.seats.map((s) => ({ id: s.id, name: s.name })), { target: this.target, hideReserves: this.hideReserves });
     r.status = 'playing';
     this.restartClock();
     this.chatSystem(`New game. ${r.game.players[r.game.start].name} goes first.`);
