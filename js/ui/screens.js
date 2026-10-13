@@ -365,15 +365,17 @@ export function Game({ snap, room, onLeave, notify }) {
     if (!playing || c === 'gold') return;
     setSel(null);
     setErr(null);
+    // The bank only adds. Gems go back from the tray, with the cross on each one.
     const n = picks.filter((x) => x === c).length;
-    if (n === 2) return setPicks([]);
+    const back = 'Use the × on a gem below to put it back.';
+    if (n === 2) return setErr(`That’s both ${COLOR_NAMES[c]}s. ${back}`);
     if (n === 1) {
       if (picks.length === 1 && g.bank[c] >= 4) return setPicks([c, c]);
-      return setPicks(picks.filter((x) => x !== c));
+      return setErr(picks.length === 1 ? `Two of a color needs 4 in the bank. ${back}` : `You already picked ${COLOR_NAMES[c]}. ${back}`);
     }
     if (!g.bank[c]) return;
-    if (picks.length === 2 && picks[0] === picks[1]) return setPicks([c]);
-    if (picks.length >= 3) return setErr('You can take 3 at most. Tap one to put it back.');
+    if (picks.length === 2 && picks[0] === picks[1]) return setErr(`Two of a color is the whole take. ${back}`);
+    if (picks.length >= 3) return setErr(`You can take 3 at most. ${back}`);
     setPicks([...picks, c]);
   };
   const isPair = picks.length === 2 && picks[0] === picks[1];
