@@ -4,7 +4,7 @@ import { Home, Lobby, Game, Notice, Connecting } from './ui/screens.js';
 import { roomFromSecret, newRoomSecret } from './net/crypto.js';
 import { HostRoom, GuestRoom, cleanName } from './net/room.js';
 import {
-  browserStorage, resolveIdentity, holdIdentity, loadHostRecord, listTables, rememberTable, forgetTable, unrememberTable, sweepStorage, loadName, saveName,
+  browserStorage, resolveIdentity, holdIdentity, loadHostRecord, listTables, rememberTable, forgetTable, unrememberTable, wasEnded, sweepStorage, loadName, saveName,
 } from './net/identity.js';
 
 const storage = browserStorage();
@@ -116,7 +116,7 @@ function HomeScreen({ notify }) {
 // ======================================================================
 
 function RoomScreen({ secret, hostId, notify }) {
-  const [phase, setPhase] = useState('connecting'); // connecting | conflict | ready | broken | expired
+  const [phase, setPhase] = useState('connecting'); // connecting | conflict | ready | broken | expired | ended
   const [snap, setSnap] = useState(null);
   const [forceNew, setForceNew] = useState(false);
   const [waited, setWaited] = useState(false);
@@ -135,6 +135,7 @@ function RoomScreen({ secret, hostId, notify }) {
       let r;
       try { r = await roomFromSecret(secret); } catch { setPhase('broken'); return; }
       if (loadHostRecord(storage, r.id)?.status === 'expired') { setPhase('expired'); return; }
+      if (wasEnded(storage, r.id)) { setPhase('ended'); return; }
       const res = await resolveIdentity(storage, r.id, { forceNew });
       if (dead) return;
       if (res.conflict) { setPhase('conflict'); return; }
@@ -213,6 +214,10 @@ function RoomScreen({ secret, hostId, notify }) {
   if (phase === 'broken') {
     return html`<${Notice} title="That link doesn’t work" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
       It looks damaged. Ask for the link again.</${Notice}>`;
+  }
+  if (phase === 'ended') {
+    return html`<${Notice} title="This game has ended" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>
+      You ended this game or started a new one, so this link no longer works.</${Notice}>`;
   }
   if (phase === 'expired') {
     return html`<${Notice} title="This lobby expired" actions=${html`<button class="btn btn--primary" onClick=${goHome}>Back to start</button>`}>

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { testStorage, rememberTable, listTables, hostedTable, forgetTable, sweepStorage, saveHostRecord, resolveIdentity, LOBBY_IDLE_MS } from '../js/net/identity.js';
+import { testStorage, rememberTable, listTables, hostedTable, forgetTable, wasEnded, sweepStorage, saveHostRecord, resolveIdentity, LOBBY_IDLE_MS } from '../js/net/identity.js';
 
 const seed = (st, roomId, extra = {}) => {
   saveHostRecord(st, roomId, { createdAt: Date.now() - 2 * 3600 * 1000, ...extra });
@@ -17,6 +17,18 @@ test('one hosted game at a time: a new one pushes the old one out, data and all'
   assert.equal(st.local.getItem('trilliant:room:A'), null);
   assert.equal(st.local.getItem('trilliant:id:A'), null);
   assert.equal(hostedTable(st).roomId, 'B');
+  assert.ok(wasEnded(st, 'A'), 'the old link can say the game ended');
+  assert.ok(!wasEnded(st, 'B'));
+});
+
+test('ending a hosted game marks its link as ended; removing a joined game does not', () => {
+  const st = testStorage();
+  rememberTable(st, { roomId: 'H', role: 'host', title: 'Your game', players: 0 });
+  rememberTable(st, { roomId: 'J', role: 'guest', title: 'Sam’s game' });
+  forgetTable(st, 'H');
+  forgetTable(st, 'J');
+  assert.ok(wasEnded(st, 'H'));
+  assert.ok(!wasEnded(st, 'J'), 'a guest can still rejoin from the link');
 });
 
 test('joining a friend keeps your hosted game; only the latest joined game is kept', () => {

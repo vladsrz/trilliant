@@ -115,6 +115,19 @@ export function listTables(storage) {
   return Array.isArray(list) ? list : [];
 }
 
+// The last few games this browser hosted and then ended, so their old links
+// say so instead of waiting for a host who will never come back.
+const ENDED_KEEP = 8;
+export function wasEnded(storage, roomId) {
+  const list = readJSON(storage.local, 'trilliant:ended');
+  return Array.isArray(list) && list.includes(roomId);
+}
+function markEnded(storage, roomId) {
+  const list = readJSON(storage.local, 'trilliant:ended');
+  const rest = (Array.isArray(list) ? list : []).filter((id) => id !== roomId);
+  writeJSON(storage.local, 'trilliant:ended', [roomId, ...rest].slice(0, ENDED_KEEP));
+}
+
 function dropGame(storage, roomId) {
   for (const k of [`trilliant:room:${roomId}`, `trilliant:id:${roomId}`, `trilliant:live:${roomId}`]) storage.local.removeItem(k);
 }
@@ -126,7 +139,10 @@ export function rememberTable(storage, entry) {
   const keep = [];
   const roles = new Set();
   for (const t of list) {
-    if (roles.has(t.role)) dropGame(storage, t.roomId);
+    if (roles.has(t.role)) {
+      if (t.role === 'host') markEnded(storage, t.roomId);
+      dropGame(storage, t.roomId);
+    }
     else { roles.add(t.role); keep.push(t); }
   }
   writeJSON(storage.local, 'trilliant:tables', keep);
@@ -137,6 +153,7 @@ export function hostedTable(storage) {
 }
 
 export function forgetTable(storage, roomId) {
+  if (listTables(storage).some((t) => t.roomId === roomId && t.role === 'host')) markEnded(storage, roomId);
   writeJSON(storage.local, 'trilliant:tables', listTables(storage).filter((t) => t.roomId !== roomId));
   dropGame(storage, roomId);
 }
