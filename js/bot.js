@@ -113,9 +113,11 @@ const TUNE = {
   open: 0.92, // discount on any card still on the board
   gem: 0.04, // a loose gem in hand
   gold: 0.2,
-  slot: 0, // what holding a reserved card costs
-  goldOnce: true,
-  restless: 0.5,
+  slot: 0.9, // what tying up a reserve slot costs; keeps reserving to a couple of times a game
+  stuckAfter: 8, // turns without buying before it counts as stuck
+  restless: 0.5, // extra pull toward any purchase, per stuck turn
+  unstick: 0.05, // randomness added to its choices, per stuck turn...
+  unstickMax: 0.25, // ...up to this much
 };
 
 // Turns of gem-taking before `card` can be bought. 0 means it can be bought now.
@@ -183,7 +185,7 @@ function standing(s, me, k) {
     let odds = 1;
     if (!held) odds = others.some((o) => autoPayment(o, card)) ? k.contested : k.open;
     const at = (gold) => worth * odds * k.patience ** (turnsAway(card, me.tokens, b, s.bank, gold) + 1);
-    reach.push({ gold: at(me.tokens.gold), plain: k.goldOnce ? at(0) : at(me.tokens.gold) });
+    reach.push({ gold: at(me.tokens.gold), plain: at(0) });
   };
   for (const l of LEVELS) for (const id of s.board[l]) if (id !== null) consider(id, false);
   for (const r of me.reserved) if (r.id !== null && r.id !== undefined) consider(r.id, true);
@@ -197,7 +199,7 @@ function standing(s, me, k) {
 const cloneSeat = (p) => ({ ...p, tokens: { ...p.tokens }, cards: [...p.cards], reserved: [...p.reserved], nobles: [...p.nobles] });
 
 // The gems to put back that hurt least, one at a time.
-function bestDiscard(s, pi, count, k) {
+function bestDiscard(s, pi, count, k, noise = () => 0) {
   const table = { ...s, bank: { ...s.bank }, players: s.players.map(cloneSeat) };
   const me = table.players[pi];
   const gems = {};
@@ -207,7 +209,7 @@ function bestDiscard(s, pi, count, k) {
       if (!me.tokens[c]) continue;
       me.tokens[c] -= 1;
       table.bank[c] += 1;
-      const score = standing(table, me, k);
+      const score = standing(table, me, k) + (c === 'gold' ? 0 : noise());
       me.tokens[c] += 1;
       table.bank[c] -= 1;
       if (!best || score > best.score) best = { c, score };
@@ -252,7 +254,18 @@ function after(s, pi, a, k) {
 
 export function botAction(s, pi, rand = Math.random, k = TUNE) {
   const me = s.players[pi];
-  if (s.phase === 'discard') return { type: 'discard', gems: bestDiscard(s, pi, s.pending.count, k).gems };
+
+  // Turns since this seat last bought anything. A long dry spell means it is
+  // stuck: usually two players each sitting on the gems the other needs. It
+  // gets keener to buy whatever it can and steadily less picky about which gems
+  // it takes and puts back, so the gems start moving again.
+  let dry = 0;
+  for (let i = s.log.length - 1; i >= 0 && !(s.log[i].t === 'buy' && s.log[i].p === pi); i--) {
+    if (s.log[i].p === pi && ['take', 'reserve', 'pass', 'timeout'].includes(s.log[i].t)) dry += 1;
+  }
+  const noise = () => rand() * (0.01 + Math.min(k.unstickMax, Math.max(0, dry - k.stuckAfter) * k.unstick));
+
+  if (s.phase === 'discard') return { type: 'discard', gems: bestDiscard(s, pi, s.pending.count, k, noise).gems };
   const actions = legalActions(s, pi, rand);
   if (s.phase !== 'play' || actions.length < 2) return actions[0];
 
@@ -266,19 +279,12 @@ export function botAction(s, pi, rand = Math.random, k = TUNE) {
     }
   }
 
-  // Turns since this seat last bought anything. The longer the dry spell, the
-  // keener it gets to buy whatever it can, which puts gems back in the bank.
-  let dry = 0;
-  for (let i = s.log.length - 1; i >= 0 && !(s.log[i].t === 'buy' && s.log[i].p === pi); i--) {
-    if (s.log[i].p === pi && ['take', 'reserve', 'pass', 'timeout'].includes(s.log[i].t)) dry += 1;
-  }
-
   let best = null;
   for (const a of actions) {
     const table = after(s, pi, a, k);
-    let score = standing(table, table.players[pi], k) + rand() * 0.01;
+    let score = standing(table, table.players[pi], k) + noise();
     if (a.type === 'reserve' && threats.has(a.card)) score += 5;
-    if (a.type === 'buy' && dry > 6) score += (dry - 6) * k.restless;
+    if (a.type === 'buy' && dry > k.stuckAfter) score += (dry - k.stuckAfter) * k.restless;
     if (!best || score > best.score) best = { a, score };
   }
   return best.a;

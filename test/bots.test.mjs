@@ -5,6 +5,7 @@ import { HostRoom } from '../js/net/room.js';
 import { testStorage, loadHostRecord } from '../js/net/identity.js';
 import { newGame, applyAction, viewFor, seededRandom, MAX_PLAYERS } from '../js/engine.js';
 import { botAction, greedyAction } from '../js/bot.js';
+import { CARDS } from '../js/data.js';
 
 // A host alone in the lobby; no relays, everything local.
 async function lobby() {
@@ -135,4 +136,53 @@ test('the bot only needs its own view, always moves legally, and beats the simpl
   }
   console.log(`  bot vs simple player: ${(wins / games * 100).toFixed(0)} (50 = even)`);
   assert.ok(wins / games > 0.75, `bot should clearly beat the simple player, got ${wins}/${games}`);
+});
+
+test('bots on their own always finish, in about as many rounds as people take', () => {
+  let longest = 0;
+  for (let seed = 1; seed <= 90; seed++) {
+    const rand = seededRandom(seed * 15485863);
+    const n = 2 + (seed % 3);
+    let s = newGame(Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `P${i}` })), { rand });
+    while (s.phase !== 'over') {
+      assert.ok(s.round <= 60, `seed ${seed}: still going in round ${s.round}`);
+      const pi = s.turn;
+      const res = applyAction(s, s.players[pi].id, botAction(viewFor(s, s.players[pi].id), pi, rand));
+      assert.ok(res.ok, res.error);
+      s = res.state;
+    }
+    longest = Math.max(longest, s.round);
+  }
+  console.log(`  longest all-bot game: ${longest} rounds`);
+});
+
+test('two bots each sitting on the gems the other needs work it out', () => {
+  const card = (color, cost) => CARDS.find((c) => c.level === 1 && c.color === color && c.points === 1 && c.cost[cost] === 4).id;
+  for (let seed = 1; seed <= 12; seed++) {
+    const rand = seededRandom(seed);
+    let s = newGame([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], { rand: seededRandom(7) });
+    // Late game: levels I and II are gone and level III is far out of reach, so
+    // the only cards in play are the reserved ones. One loose gem is in the bank.
+    s.decks[1] = [];
+    s.decks[2] = [];
+    s.board[1] = [null, null, null, null];
+    s.board[2] = [null, null, null, null];
+    const far = s.decks[3].splice(0, 4);
+    s.players[0].tokens = { white: 3, blue: 4, green: 1, red: 0, black: 2, gold: 0 };
+    s.players[1].tokens = { white: 0, blue: 0, green: 3, red: 4, black: 2, gold: 1 };
+    s.bank = { white: 1, blue: 0, green: 0, red: 0, black: 0, gold: 4 };
+    s.players[0].reserved = [card('blue', 'red'), far[0], far[1]].map((id) => ({ id, blind: false }));
+    s.players[1].reserved = [card('black', 'blue'), far[2], far[3]].map((id) => ({ id, blind: false }));
+    s.start = 0;
+    s.turn = 0;
+    let moves = 0;
+    while (!s.log.some((e) => e.t === 'buy')) {
+      assert.notEqual(s.phase, 'over', `seed ${seed}: the game ended on passes`);
+      assert.ok(moves++ < 200, `seed ${seed}: nobody bought anything`);
+      const pi = s.turn;
+      const res = applyAction(s, s.players[pi].id, botAction(viewFor(s, s.players[pi].id), pi, rand));
+      assert.ok(res.ok, res.error);
+      s = res.state;
+    }
+  }
 });
