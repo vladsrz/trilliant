@@ -4,6 +4,8 @@
 import { CARDS } from '../data.js';
 
 const MOVE_TYPES = new Set(['take', 'reserve', 'buy', 'discard', 'noble', 'timeout']);
+const FLIGHT_MS = 560;
+const GEM_STAGGER_MS = 85;
 
 export function capturePieces(root) {
   const pieces = new Map();
@@ -61,24 +63,23 @@ function fly(pieces, root, from, to, fallback, delay = 0) {
   const dx = b.left + b.width / 2 - a.left - a.width / 2;
   const dy = b.top + b.height / 2 - a.top - a.height / 2;
   const scale = Math.min(1, Math.max(0.23, b.width / a.width));
-  const duration = 420;
   const motion = ghost.animate([
     { transform: 'translate(0, 0) scale(1)', opacity: 1, offset: 0 },
     { transform: `translate(${dx * 0.48}px, ${dy * 0.48 - 18}px) scale(${(1 + scale) / 2})`, opacity: 1, offset: 0.52 },
     { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.85, offset: 1 },
-  ], { duration, delay, easing: 'cubic-bezier(.2,.68,.2,1)', fill: 'forwards' });
+  ], { duration: FLIGHT_MS, delay, easing: 'cubic-bezier(.2,.68,.2,1)', fill: 'forwards' });
   motion.finished.then(() => {
     ghost.remove();
     target.animate([
       { transform: 'scale(1)' }, { transform: 'scale(1.19)' }, { transform: 'scale(1)' },
-    ], { duration: 240, easing: 'ease-out' });
+    ], { duration: 280, easing: 'ease-out' });
   }).catch(() => ghost.remove());
 }
 
 function gems(counts, fn) {
   let n = 0;
   for (const [color, count] of Object.entries(counts || {})) {
-    for (let i = 0; i < count; i++) fn(color, n++ * 65);
+    for (let i = 0; i < count; i++) fn(color, n++ * GEM_STAGGER_MS);
   }
 }
 
