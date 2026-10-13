@@ -464,6 +464,8 @@ export function Game({ snap, room, onLeave, notify }) {
       <${Tray} ...${{ g, me, you, myTurn, over, current, picks, isPair, takeReady, rules, sel, busy, err, fresh, mustReturn, marked, markedTotal, isHost, snap }}
         onTake=${() => send({ type: 'take', gems: picks })}
         onClear=${() => { setPicks([]); setSel(null); setMarked({}); setErr(null); }}
+        onUnpick=${(i) => { setErr(null); setPicks(picks.filter((_, k) => k !== i)); }}
+        onUnmark=${(c) => setMarked({ ...marked, [c]: Math.max(0, (marked[c] || 0) - 1) })}
         onBuy=${(id) => send({ type: 'buy', card: id })}
         onReserveCard=${(id) => send({ type: 'reserve', card: id })}
         onReserveDeck=${(level) => send({ type: 'reserve', level })}
@@ -549,6 +551,14 @@ function ShortLine({ me, card }) {
   return html`<span class="pay">You need ${total} more:${short.map(([c, n]) => html`<span class="pay__item"><${Gem} color=${c} title=${COLOR_NAMES[c]} />${n}</span>`)}${me.tokens.gold ? html`<span>(gold covers ${me.tokens.gold})</span>` : null}</span>`;
 }
 
+// A gem chosen in the tray; its cross takes that one gem back out.
+function Pick({ color, label, disabled, onRemove }) {
+  return html`<button type="button" class="pick" title=${label} aria-label=${label} disabled=${disabled} onClick=${onRemove}>
+    <${Gem} color=${color} />
+    <span class="pick__x">${CrossIcon}</span>
+  </button>`;
+}
+
 function Tray(p) {
   const { g, me, you, myTurn, over, current, picks, isPair, takeReady, rules, sel, busy, err, fresh, mustReturn, marked, markedTotal } = p;
   let title, hint, extra = null, buttons = null;
@@ -567,7 +577,7 @@ function Tray(p) {
     hint = `You can hold ${MAX_TOKENS}. Tap ${mustReturn} of your gems below to put back.`;
     const picked = [];
     for (const c of TOKEN_COLORS) for (let i = 0; i < (marked[c] || 0); i++) picked.push(c);
-    extra = picked.length ? html`<div class="tray__picks">${picked.map((c) => html`<${Gem} color=${c} title=${COLOR_NAMES[c]} />`)}</div>` : null;
+    extra = picked.length ? html`<div class="tray__picks">${picked.map((c) => html`<${Pick} color=${c} label=${`Keep ${COLOR_NAMES[c]}`} disabled=${busy} onRemove=${() => p.onUnmark(c)} />`)}</div>` : null;
     buttons = html`
       <button type="button" class="btn btn--primary" disabled=${busy || markedTotal !== mustReturn} onClick=${p.onReturn}>Put back ${markedTotal}/${mustReturn}</button>
       ${markedTotal ? html`<button type="button" class="btn btn--ghost" onClick=${p.onClear}>Cancel</button>` : null}`;
@@ -594,7 +604,7 @@ function Tray(p) {
       <button type="button" class="btn btn--ghost" onClick=${p.onClear}>Cancel</button>`;
   } else if (picks.length) {
     title = 'Take gems';
-    extra = html`<div class="tray__picks">${picks.map((c) => html`<${Gem} color=${c} title=${COLOR_NAMES[c]} />`)}</div>`;
+    extra = html`<div class="tray__picks">${picks.map((c, i) => html`<${Pick} color=${c} label=${`Put back ${COLOR_NAMES[c]}`} disabled=${busy} onRemove=${() => p.onUnpick(i)} />`)}</div>`;
     if (isPair) hint = `Two ${COLOR_NAMES[picks[0]]}s.`;
     else if (takeReady) hint = 'Ready.';
     else {
