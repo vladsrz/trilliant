@@ -21,7 +21,7 @@ Deliberately restrained: plain dark table, flat ivory cards, no art/textures/gra
 Gem take animations must let players follow each color from the bank to a hand; use slow, visibly staggered flights because quick simultaneous movement hides what was taken.
 Keep a selected bank gem centered inside its gold ring; moving the gem upward makes the ring look off-center.
 Card states, quietest to loudest: hover (soft glow), buyable (yellow ring, only when the host turned Hints on), selected (thicker yellow ring, lifted, glowing). Rings are outlines sized from `--cw` so neighbors never collide on phones.
-Wide screens: the moves/chat panel sits above the opponents, and the tray sits beside your seat (`.dock`, a container query on `.main`). Narrower than that, `.dock` is `display: contents` so the phone tray stays sticky.
+Wide screens: the moves/chat panel is a short panel on top with the opponents straight under it, and the tray shares the bottom row half-and-half with your seat (`.dock`, a container query on `.main`). Narrower than that, `.dock` is `display: contents` so the phone tray stays sticky.
 
 ## Verify before calling a change done
 1. `npm test` and `npm run test:live`.

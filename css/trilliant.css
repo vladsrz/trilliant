@@ -535,11 +535,12 @@ button { cursor: pointer; }
    tall, narrow board (a half-width window) the nobles move above the cards,
    which leaves more width for bigger cards. */
 @media (min-width: 861px) {
-  /* The moves and chat sit on top; opponents sit at the bottom, level with your own seat. */
+  /* The moves and chat sit on top as a short panel; opponents follow straight after it. */
   .side .opps { order: 2; }
+  .side .feed { flex: 0 1 38%; }
   .main { container: main / inline-size; }
   @container main (min-width: 940px) {
-    .dock { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: stretch; }
+    .dock { display: grid; grid-template-columns: minmax(0, 1fr) minmax(max-content, 1fr); gap: 10px; align-items: stretch; }
     .dock .tray { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 12px 14px; }
     .dock .tray__text { flex: none; min-width: 0; width: 100%; }
     .dock .tray__hint { white-space: normal; }
