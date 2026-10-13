@@ -382,7 +382,7 @@ button { cursor: pointer; }
 .well.is-empty .gem { opacity: 0.16; filter: grayscale(1); }
 .well.is-empty .well__count { background: var(--velvet-500); color: var(--text-faint); }
 .well.is-picked { box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6), 0 0 0 2px var(--brass-hi); }
-.well.is-picked .gem { transform: translateY(-5px) scale(1.1); }
+.well.is-picked .gem, .well.is-picked:hover .gem { transform: scale(1.1); }
 .well--gold { margin-bottom: calc(var(--tw) * 0.14); }
 
 /* ---------- tray ---------- */
